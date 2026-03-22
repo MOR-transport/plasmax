@@ -1,0 +1,23 @@
+# Converted from matlab/params/PARAMS_two_stream.m
+method: predcorr
+physics:
+  charge: -1.0
+  mass: 1.0
+interp:
+  order: 3
+grid:
+  nx: 1024  # 2^10
+  nv: 1024
+  lx: 31.41592653589793   # 2*pi/k with k = 0.2
+  lv: 15.707963267948966  # 5*pi
+inicond:
+  case: two_stream
+  alpha: null
+  eps: 0.05
+  v0: 3
+  k: 0.2
+time:
+  nt_max: 4000
+  dt: 0.2
+  tend: 40
+  plot_freq: 10

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "plasma-sim"
+version = "0.1.0"
+description = "Jax semi-Lagrangian plasma simulation"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.8.0",
+    "PyYAML>=6.0",
+    # NVIDIA GPU wheels are published for Linux only (see JAX docs). Elsewhere: CPU jaxlib.
+    "jax[cuda12]>=0.4.28; sys_platform == 'linux'",
+    "jax>=0.4.28; sys_platform != 'linux'",
+]
+
+[project.optional-dependencies]
+# Use on Linux if you have CUDA 13 + a new enough driver (see JAX installation docs).
+cuda13 = ["jax[cuda13]>=0.4.28"]
+
+[project.scripts]
+plasma-sim = "src.sim:simulate"
+
+[tool.hatch.build.targets.wheel.force-include]
+"params" = "params"
