@@ -50,11 +50,7 @@ def run_time_loop(cfg) -> tuple[jnp.ndarray, jnp.ndarray, float]:
         t += cfg.time.dt
         tcpu.append(time_module.perf_counter() - t0)
 
-        print(
-            f"iter: {it}, time: {t:.6g}, dt: {cfg.time.dt:.6g}, "
-            f"cpu_time: {tcpu[-1]:.4f} s",
-            flush=True,
-        )
+        print(f"iter: {it}, time: {t:.6g}, dt: {cfg.time.dt:.6g}, "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
             plot_solution(cfg, f, f"plots/solution_{it:04d}.png")
         if t >= cfg.time.tend - 1e-15:

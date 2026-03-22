@@ -68,3 +68,19 @@ def advect(f: jnp.ndarray, efield: jnp.ndarray, grid: Grid, dt: float, order: in
     f = _adv_v(f, grid, efield, dt)
     f = _adv_x(f, grid, dt / 2.0)
     return f
+
+def advect_with_source(f: jnp.ndarray, efield: jnp.ndarray, grid: Grid, dt: float, order: int) -> jnp.ndarray:
+    """Strang split: x(dt/2) v(dt) x(dt/2). Only cubic (order 3) is implemented."""
+    if order != 3:
+        raise NotImplementedError(f"Only interp.order=3 is implemented (got {order}).")
+    f = _adv_x(f, grid, dt / 2.0)
+    f = _adv_v(f, grid, efield, dt/2.0)
+    f = f + dt * source(f)
+    f = _adv_v(f, grid, efield, dt/2.0)
+    f = _adv_x(f, grid, dt / 2.0)
+    return f
+
+
+def source(f: jnp.ndarray) -> jnp.ndarray:
+    
+    return (0 - f)*1e-3

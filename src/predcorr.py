@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import jax.numpy as jnp
 
-from .advect import advect
+from .advect import advect, advect_with_source
 from .config import Config, Grid
 from .physics import compute_density, vpoisson
 
