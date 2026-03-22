@@ -1,0 +1,21 @@
+# Converted from matlab/params/PARAMS_landau_damping.m (grid + time only for this step).
+method: predcorr # or nufi (not implemented in Python yet)
+physics:
+  charge: -1.0
+  mass: 1.0
+interp:
+  order: 3
+grid:
+  nx: 128   # 2^7
+  nv: 128
+  lx: 12.566370614359172  # 2*pi/k with k = 0.5
+  lv: 12
+inicond:
+  case: landau_damping
+  k: 0.5
+  alpha: 0.01
+time:
+  nt_max: 4000
+  dt: 0.1
+  tend: 20
+  plot_freq: 10
