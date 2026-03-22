@@ -13,7 +13,6 @@ JAX-based Vlasov–Poisson solver.
 From the repository root:
 
 ```bash
-cd python
 python -m venv .venv
 source .venv/bin/activate          # Linux / macOS
 # .venv\Scripts\activate           # Windows (cmd)
@@ -36,7 +35,7 @@ Editable install (`-e .`) registers the `plasma-sim` console script and keeps `p
 
 ## Run
 
-With the venv activated and current directory still `python/`:
+With the venv activated:
 
 ```bash
 plasma-sim                          # default: params/landau_damping.yaml
