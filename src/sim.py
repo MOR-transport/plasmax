@@ -83,6 +83,35 @@ def plot_solution(cfg, f: jnp.ndarray,fname: str) -> None:
         plt.show()
 
 
+def plot_error(cfg):
+    ref = jnp.float32(jnp.log2(cfg.time.dt))
+    if ref - jnp.ceil(ref) != 0:
+        raise ValueError(f"Invalid time step: dt must be a negative power of 2")
+    ref = jnp.int32(ref)
+    print(f"{-ref} computations needed")
+
+    f_ref, _, _ = run_time_loop(cfg)
+    errors = []
+
+    powers = jnp.arange(ref+1, 0, dtype=jnp.float32)
+    for power in powers:
+        cfg.time.dt = 2**power
+        f, _, _ = run_time_loop(cfg)
+        errors.append(jnp.sum(jnp.square(f-f_ref)))
+
+    _, ax = plt.subplots(figsize=(8, 5))
+    dts = jnp.power(jnp.full((-ref-1,), 2), powers)
+    
+    ax.plot(dts, errors, "x-", label="Errors")
+    ax.plot(dts, dts**2, "--", label=r"$y \mapsto x^2$")
+    ax.legend()
+    ax.set_xlabel("time step")
+    ax.set_ylabel(r"error")
+    ax.set_title(f"Errors for ({cfg.inicond.case})")
+    ax.invert_xaxis()
+    plt.show()
+
+
 def simulate() -> None:
     parser = argparse.ArgumentParser(description="Vlasov–Poisson driver (predcorr / NuFI stub).")
     parser.add_argument(
@@ -101,7 +130,7 @@ def simulate() -> None:
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
 
-    run_time_loop(cfg)
+    plot_error(cfg)
 
 
 if __name__ == "__main__":
