@@ -69,21 +69,17 @@ def advect(f: jnp.ndarray, efield: jnp.ndarray, grid: Grid, dt: float, order: in
     f = _adv_x(f, grid, dt / 2.0)
     return f
 
-def advect_with_source(f: jnp.ndarray, efield: jnp.ndarray, grid: Grid, dt: float, order: int) -> jnp.ndarray:
+def advect_with_source(f: jnp.ndarray, efield: jnp.ndarray, grid: Grid, dt: float, order: int, source: function) -> jnp.ndarray:
     """Strang split: x(dt/2) v(dt) x(dt/2). Only cubic (order 3) is implemented."""
     if order != 3:
         raise NotImplementedError(f"Only interp.order=3 is implemented (got {order}).")
     f = _adv_x(f, grid, dt / 2.0)
     f = _adv_v(f, grid, efield, dt/2.0)
-    f = f + dt * source(f, grid)
+
+    src_old = source(f)
+    f_12 = f + dt*src_old
+    f = f + (dt/2) * (src_old + source(f_12))
+
     f = _adv_v(f, grid, efield, dt/2.0)
     f = _adv_x(f, grid, dt / 2.0)
     return f
-
-def source(f: jnp.ndarray, grid: Grid) -> jnp.ndarray:
-    n = jnp.sum(f, axis=0) * grid.dv # jnp.full((256,), 1)
-    u = (jnp.sum(f * grid.v, axis=0) * grid.dv) / n
-    T = (jnp.sum(f * (grid.v - u[:, None])**2, axis=0) * grid.dv) / n
-    n, u, T, v_row = n[:, None], u[:, None], T[:, None], grid.v[None, :]
-    MF = (n / jnp.sqrt(2 * jnp.pi * T)) * jnp.exp(- ((v_row - u)**2) / (2 * T))
-    return (MF - f)
