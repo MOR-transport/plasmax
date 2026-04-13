@@ -23,7 +23,7 @@ def predictor_corrector_step(
 
     rho0 = compute_density(f, float(grid.dv))
     e0 = vpoisson(rho0, grid, cfg.physics.charge)
-    f12 = advect_with_source(f, q_m * e0, grid, dt / 2.0, ord_, source=lambda fun: maxwell_distrib(fun,cfg))
+    f12 = advect_with_source(f, q_m * e0, grid, dt / 2.0, ord_, source=lambda fun: maxwell_distrib(fun,cfg) )
 
     rho12 = compute_density(f12, float(grid.dv))
     e12 = vpoisson(rho12, grid, cfg.physics.charge)
