@@ -7,6 +7,7 @@ import jax.numpy as jnp
 
 from .config import Grid
 
+jax.config.update("jax_enable_x64", True)
 
 def _cubic_periodic_weights(xi: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Uniform cubic Lagrange weights for nodes at -1, 0, 1, 2 in index space; ``xi`` in [0,1)."""
