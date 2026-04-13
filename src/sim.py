@@ -16,6 +16,7 @@ from .diagnostics import measure
 
 jax.config.update("jax_enable_x64", True)
 
+jax.config.update("jax_enable_x64", True)
 
 # Default YAML next to project root `python/`, sibling of `src/` and `params/`.
 _DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "params" / "landau_damping.yaml"
