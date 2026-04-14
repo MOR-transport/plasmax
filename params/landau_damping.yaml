@@ -7,8 +7,8 @@ physics:
 interp:
   order: 3
 grid:
-  nx: 1024 # 2^7
-  nv: 1024
+  nx: 256 # 2^7
+  nv: 256
   lx: 12.566370614359172  # 2*pi/k with k = 0.5
   lv: 6
 inicond:
