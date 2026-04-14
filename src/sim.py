@@ -33,6 +33,17 @@ def plot_solution(cfg, f: jnp.ndarray,fname: str) -> None:
     else:
         plt.show()
 
+def plot_Efield(cfg, Efield: jnp.ndarray,fname: str) -> None:
+    cfg.grid = make_periodic_grid(cfg.grid)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    plt.plot(cfg.grid.x, Efield)
+    ax.set_xlabel(r"$x$")
+    ax.set_title(f"Electric field ({cfg.inicond.case})")
+    fig.tight_layout()
+    if fname is not None:
+        fig.savefig(fname)
+    else:
+        plt.show()
 
 def plot_profile(cfg, f: jnp.ndarray, t:float, axs: jax.typing.ArrayLike):
     cfg.grid = make_periodic_grid(cfg.grid)
@@ -56,7 +67,9 @@ def plot_time_error(cfg):
     dt_ref = jnp.int32(dt_ref)
     print(f"{-dt_ref} computations needed for error in time")
 
-    f_ref, _, _ = run_time_loop(cfg)
+    f_ref, _ = run_time_loop(cfg)
+    f_ref = f_ref[-1, :, :]
+    print(f_ref)
 
     errors_dts = []
     dts = []
@@ -66,7 +79,8 @@ def plot_time_error(cfg):
         dt = 2.0 ** power
         cfg.time.dt = dt
 
-        f, _, _ = run_time_loop(cfg)
+        f, _ = run_time_loop(cfg)
+        f = f[-1, :, :]
 
         err = jnp.sqrt(jnp.sum((f - f_ref) ** 2))  # L2 error
         errors_dts.append(err)
@@ -111,7 +125,8 @@ def plot_space_error(cfg):
     print(f"{nxv_ref - 5} computations needed for error in space")
 
     # 1. Calcul de la solution de référence (Grille fine)
-    f_ref, _, _ = run_time_loop(cfg)
+    f_ref, _ = run_time_loop(cfg)
+    f_ref = f_ref[-1, :, :]
 
     errors_nxvs = []
     nxvs = []
@@ -123,7 +138,8 @@ def plot_space_error(cfg):
         cfg.grid.nv = step
         cfg.grid = make_periodic_grid(cfg.grid)
 
-        f, _, _ = run_time_loop(cfg)
+        f, _ = run_time_loop(cfg)
+        f = f[-1, :, :]
 
         ratio = nxv_backup // step
 
@@ -182,11 +198,17 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     rho = compute_density(f, grid.dv)
     Efield = vpoisson(rho, grid, cfg.physics.charge)
 
-    nt_cap = min(cfg.time.nt_max, int(math.ceil(cfg.time.tend / cfg.time.dt)) + 2)
+    nt_cap = min(cfg.time.nt_max, int(math.ceil(cfg.time.tend / cfg.time.dt)))
     tcpu = []
 
     if nb_profile > 0:
         fig, axs = plt.subplots(2, 1, figsize=(16, 10))
+
+    f_hist = jnp.empty((nt_cap+1, grid.nv, grid.nx), dtype=jnp.float64)
+    f_hist = f_hist.at[0, :, :].set(f)
+
+    Efield_hist = jnp.empty((nt_cap+1, grid.nx), dtype=jnp.float64)
+    Efield_hist = Efield_hist.at[0, :].set(Efield)
 
     for it in range(1, nt_cap + 1):
 
@@ -195,9 +217,13 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
         t += cfg.time.dt
         tcpu.append(time_module.perf_counter() - t0)
 
+        f_hist = f_hist.at[it, :, :].set(f)
+        Efield_hist = Efield_hist.at[it, :].set(Efield)
+
         print(f"iter: {it}, time: {t:.6g}, dt: {cfg.time.dt:.6g}, "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
             plot_solution(cfg, f, f"plots/solution_{it:04d}.png")
+            plot_Efield(cfg, Efield, f"plots/Efield_{it:04d}.png")
         if nb_profile > 0:
             if cfg.time.plot_freq > 0 and it % ((nt_cap-2) // nb_profile) == 0:
                 plot_profile(cfg, f, t, axs)
@@ -219,7 +245,7 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
         axs[1].legend()
         fig.savefig(f"plots/profile.png")
 
-    return f, Efield, t
+    return f_hist, Efield_hist
 
 
 def simulate() -> None:
@@ -240,8 +266,7 @@ def simulate() -> None:
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
 
-    plot_time_error(cfg)
-
+    run_time_loop(cfg)
 
 if __name__ == "__main__":
     simulate()
