@@ -1,10 +1,13 @@
 from .config import Grid
 import jax.numpy as jnp
 
+import jax
+jax.config.update("jax_enable_x64", True)
+
 def make_periodic_grid(grid: Grid) -> Grid:
     nx, nv = grid.nx, grid.nv
     x = jnp.linspace(0, grid.lx, nx, endpoint=False)
-    v = jnp.linspace(-grid.lv, grid.lv, nv)
+    v = jnp.linspace(-grid.lv, grid.lv, nv, endpoint=False)
     dx = x[1] - x[0]
     dv = v[1] - v[0]
     grid.x = x
