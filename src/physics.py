@@ -6,6 +6,9 @@ import jax.numpy as jnp
 
 from .config import Grid
 
+import jax
+jax.config.update("jax_enable_x64", True)
+
 
 def compute_density(f: jnp.ndarray, dv: float) -> jnp.ndarray:
     """∫ f dv along velocity axis (first axis is v, second is x)."""
