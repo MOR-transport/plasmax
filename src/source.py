@@ -1,4 +1,5 @@
 import jax
+import math
 
 jax.config.update("jax_enable_x64", True)
 
@@ -15,7 +16,7 @@ jax.config.update("jax_enable_x64", True)
 def plot_source(cfg: Config, source, f: jnp.ndarray, fname):
     cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
-    pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, source(f, cfg), shading="auto")
+    pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, source(cfg, f), shading="auto")
     fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
     ax.set_xlabel(r"$x$")
     ax.set_ylabel(r"$v$")
@@ -27,7 +28,7 @@ def plot_source(cfg: Config, source, f: jnp.ndarray, fname):
         plt.show()
 
 
-def maxwell_distrib(f: jnp.ndarray, cfg: Config) -> jnp.ndarray:
+def maxwell_distrib(cfg, f: jnp.ndarray) -> jnp.ndarray:
     v_col = cfg.grid.v[:, None]
     dv = cfg.grid.dv
 
@@ -42,3 +43,23 @@ def maxwell_distrib(f: jnp.ndarray, cfg: Config) -> jnp.ndarray:
     MF = (n_row / jnp.sqrt(2 * jnp.pi * T_row)) * jnp.exp(- ((v_col - u_row)**2) / (2 * T_row))
     
     return (MF - f) / cfg.physics.knudsen
+
+
+def filter_xv(cfg):    
+    v_col = cfg.grid.v[:, None]
+    res = (1 / (2*jnp.pi)) * jnp.exp((-v_col**2) / 20)
+    
+    return jnp.broadcast_to(res, (cfg.grid.nv, cfg.grid.nx))
+
+
+def filter_t(cfg, t_star=0.6):
+    Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
+    t = jnp.linspace(0, cfg.time.tend, Nt)
+    return 0.5 + 0.5 * jnp.tanh(t - t_star)
+
+
+def f_exp(cfg, alpha=100, beta=0.1):
+    Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1   
+    v_mat = cfg.grid.v[None, :, None]
+    res = (alpha / (2*jnp.pi)) * jnp.exp((-v_mat**2) / (2*beta))    
+    return jnp.broadcast_to(res, (Nt, cfg.grid.nv, cfg.grid.nx))

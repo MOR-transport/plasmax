@@ -60,10 +60,17 @@ class Interp:
 
 
 @dataclass
+class Optim:
+    lr: float = 0.01
+    Nopt: int = 10
+
+
+@dataclass
 class Config:
     inicond: IniCond
     grid: Grid
     time: Time
+    optim: Optim
     method: str = "predcorr"
     physics: Physics = field(default_factory=Physics)
     interp: Interp = field(default_factory=Interp)
@@ -80,4 +87,5 @@ def load_config(path: str | Path) -> Config:
         method=str(data.get("method", "predcorr")),
         physics=Physics(**(data.get("physics") or {})),
         interp=Interp(**(data.get("interp") or data.get("opt_interp") or {})),
+        optim=Optim(**data["optim"])
     )

@@ -1,5 +1,6 @@
 import math
 from pathlib import Path
+import shutil
 import time as time_module
 
 import jax
@@ -92,8 +93,13 @@ def adjoint(cfg):
     inicond = inicond_initiale.copy()
     residuals = []
 
-    folder = Path(f"plots/optimization/step-{cfg.optim.lr}_Nopt-{cfg.optim.Nopt}/iterations")
-    folder.mkdir(parents=True, exist_ok=True)
+    folder = Path(f"plots/optimization/default_optim/")
+    folder_it = folder / "iterations"
+
+    if folder.exists() and folder.is_dir():
+            shutil.rmtree(folder)
+
+    folder_it.mkdir(parents=True)
 
     for it in range(cfg.optim.Nopt):
         f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond)
@@ -104,9 +110,9 @@ def adjoint(cfg):
         inicond += cfg.optim.lr * adj_hist[0, :, :]
         cfg.time.dt = - cfg.time.dt
 
-        plot_inicond(cfg, inicond, folder / f"inicond_{it:04d}.png")
+        plot_inicond(cfg, inicond, folder_it / f"inicond_{it:04d}.png")
     
-    plot_optimisation(cfg, inicond_initiale, inicond, residuals, f"plots/optimization/step-{cfg.optim.lr}_Nopt-{cfg.optim.Nopt}/result.png")
+    plot_optimisation(cfg, inicond_initiale, inicond, residuals, folder / "result.png")
 
 
 def optimize(cfg):
