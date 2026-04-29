@@ -61,7 +61,10 @@ class Interp:
 
 @dataclass
 class Optim:
-    lr: float = 0.01
+    fexp: str
+    sigxv: str
+    sigt: str
+    lr: float = 10
     Nopt: int = 10
 
 

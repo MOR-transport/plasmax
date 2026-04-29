@@ -3,6 +3,7 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+from tikzplotlib import save
 
 from .periodic_grid import make_periodic_grid
 from .sim import run_time_loop
@@ -11,7 +12,7 @@ from .source import maxwell_distrib
 jax.config.update("jax_enable_x64", True)
 
 
-def plot_time_error(cfg, src=None):
+def plot_time_error(cfg, src=None, format="png"):
     dt_backup = cfg.time.dt
     dt_ref = jnp.float32(jnp.log2(cfg.time.dt))
     if dt_ref - jnp.ceil(dt_ref) != 0:
@@ -67,13 +68,16 @@ def plot_time_error(cfg, src=None):
     folder = Path(f"plots/errors")
     folder.mkdir(parents=True, exist_ok=True)
 
-    fig.savefig(folder / f"time_error-Kn_{cfg.physics.knudsen:.0e}.png")
+    if format == "png":
+        fig.savefig(folder / f"time_error-Kn_{cfg.physics.knudsen:.0e}.png")
+    elif format == "tex":
+        save(folder / f"time_error-Kn_{cfg.physics.knudsen:.0e}.tex", encoding="utf-8")
     plt.close(fig)
 
     cfg.time.dt = dt_backup
 
 
-def plot_space_error(cfg, src=None):
+def plot_space_error(cfg, src=None, format="png"):
     if cfg.grid.nx != cfg.grid.nv:
         raise ValueError("Invalid space step: dx and dv must be equal")
     
@@ -137,7 +141,10 @@ def plot_space_error(cfg, src=None):
     folder = Path(f"plots/errors")
     folder.mkdir(parents=True, exist_ok=True)
 
-    fig.savefig(folder / f"space_error-Kn_{cfg.physics.knudsen:.0e}.png")
+    if format == "png":
+        fig.savefig(folder / f"space_error-Kn_{cfg.physics.knudsen:.0e}.png")
+    elif format == "tex":
+        save(folder / f"space_error-Kn_{cfg.physics.knudsen:.0e}.tex", encoding="utf-8")
     plt.close(fig)
 
     cfg.grid.nx = nxv_backup
@@ -154,5 +161,5 @@ def plot_errors(cfg):
     grid = make_periodic_grid(cfg.grid)
     cfg.grid = grid
 
-    plot_time_error(cfg, src=maxwell_distrib)
-    #plot_space_error(cfg, src=maxwell_distrib)
+    #plot_time_error(cfg, src=maxwell_distrib, format="tex")
+    plot_space_error(cfg, src=maxwell_distrib, format="tex")

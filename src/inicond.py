@@ -3,25 +3,8 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 
-from .config import Config, load_config
-from .periodic_grid import make_periodic_grid
-
-def plot_inicond(cfg, inicond: jnp.ndarray, fname: str) -> None:
-    cfg.grid = make_periodic_grid(cfg.grid)
-    fig, ax = plt.subplots(figsize=(8, 5))
-    pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, inicond, shading="auto")
-    fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
-    ax.set_xlabel(r"$x$")
-    ax.set_ylabel(r"$v$")
-    ax.set_title(f"Initial condition ({cfg.inicond.case})")
-    fig.tight_layout()
-    if fname is not None:
-        fig.savefig(fname)
-        plt.close(fig)
-    else:
-        plt.show()
+from .config import Config
 
 
 def landau_damping(x, v, alpha: float, k: float) -> jnp.ndarray:

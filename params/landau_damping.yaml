@@ -14,12 +14,14 @@ grid:
 inicond:
   case: landau_damping
   k: 0.5
-  alpha: 0.01
+  alpha: 0.5
 time:
   nt_max: 4000
   dt: 0.1
-  tend: 1
-  plot_freq: 1
+  tend: 15
+  plot_freq: 10
 optim:
-  lr: 0.1
+  fexp: gaussian
+  sigxv: gaussian
+  sigt: gate
   Nopt: 10
