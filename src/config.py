@@ -61,9 +61,13 @@ class Interp:
 
 @dataclass
 class Optim:
-    fexp: str
-    sigxv: str
-    sigt: str
+    case: str
+    k: float | None = None
+    alpha: float | None = None
+    eps: float | None = None
+    v0: float | None = None
+    filter_xv: str = "ones"
+    filter_t: str = "ones"
     lr: float = 10
     Nopt: int = 10
 

@@ -100,6 +100,6 @@ def simulate(cfg) -> None:
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
 
-    f_hist, Efield_hist = run_time_loop(cfg, src=maxwell_distrib, format="tex")
-    plot_profile(cfg, f_hist, format="tex", nb_profiles=3)
+    f_hist, Efield_hist = run_time_loop(cfg, src=maxwell_distrib, format="png")
+    plot_profile(cfg, f_hist, format="png", nb_profiles=3)
 

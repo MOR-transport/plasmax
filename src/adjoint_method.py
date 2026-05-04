@@ -6,14 +6,20 @@ import time as time_module
 import jax
 import jax.numpy as jnp
 
-from .inicond import get_inicond
-from .periodic_grid import make_periodic_grid
-from .source import compute_src, functionnal
+from .inicond import get_inicond, get_inicond_exp
 from .sim import run_time_loop
 from .advect import advect_with_source_hist
-from .plotting import make_anim_2d, plot_optimisation, plot_f_exp, plot_inicond
+from .plotting import make_anim_2d, plot_optimisation
+from .periodic_grid import make_periodic_grid
+from .source import get_filters_exp, compute_src
 
 jax.config.update("jax_enable_x64", True)
+
+
+def functionnal(cfg, f_hist, fexp):
+    sigxv, sigt = get_filters_exp(cfg)
+    integrant = (1/2) * (f_hist - fexp)**2 * sigxv * sigt
+    return jnp.sum(integrant) * cfg.time.dt * cfg.grid.dx * cfg.grid.dv
 
 
 def run_time_loop_adjoint(cfg, Efield, src):
@@ -54,9 +60,12 @@ def run_time_loop_adjoint(cfg, Efield, src):
     return f_hist
 
 
-def line_search(cfg, inicond, f, adj, m=1e-4, theta=0.5):
-    alpha = 100
-    J = lambda f: functionnal(cfg, f)
+def line_search(cfg, inicond, f, fexp, adj, m=1e-4, theta=0.5, last_alpha=1.25):
+    if last_alpha is None:
+        alpha = 1.25
+    else: 
+        alpha = last_alpha
+    J = lambda f: functionnal(cfg, f, fexp)
 
     while True:
         inicond_tmp = inicond + alpha * adj
@@ -68,18 +77,25 @@ def line_search(cfg, inicond, f, adj, m=1e-4, theta=0.5):
             return inicond_tmp, f_new, Efield_new, alpha
         alpha *= theta
 
-        if alpha <= 1e-15:
-            raise("Line search err")
+        if alpha < 1e-3:
+            break
+    
+    return inicond_tmp, f_new, Efield_new, alpha
 
 
-def adjoint(cfg, line_search_opt=True, tolerance=0.5):
+def adjoint(cfg, line_search_opt=True, tolerance=0.01):
     cfg.grid = make_periodic_grid(cfg.grid)
     cfg.time.plot_freq = 0
+
+    inicond_exp = get_inicond_exp(cfg)(cfg.grid.X, cfg.grid.V)
+    f_exp, _ = run_time_loop(cfg, inicond=inicond_exp)
 
     inicond_initiale = get_inicond(cfg)(cfg.grid.X, cfg.grid.V)  
     inicond = inicond_initiale.copy()
     residuals = []
     alphas = []
+    alpha = None
+    grads = []
 
     folder = Path(f"plots/optimization/default_optim/")
     folder_it = folder / "iterations"
@@ -89,36 +105,33 @@ def adjoint(cfg, line_search_opt=True, tolerance=0.5):
 
     folder_it.mkdir(parents=True)
 
-    if line_search_opt:
-        f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond)
+    f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond)
+    plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp, folder_it / f"opt_{0:04d}.png")
 
-    for it in range(cfg.optim.Nopt):
-        
-        if not line_search_opt:
-            f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond)
+    for it in range(1, cfg.optim.Nopt+1):
 
-        residuals.append(functionnal(cfg, f_hist))
+        residuals.append(functionnal(cfg, f_hist, f_exp))
         
-        src = compute_src(cfg, f_hist)
+        src = compute_src(cfg, f_hist, f_exp)
         adj_hist = run_time_loop_adjoint(cfg, Efield_hist, src)
-        
-        if jnp.sqrt(jnp.sum(adj_hist[0, :, :] ** 2)) <= tolerance:
+
+        grads.append(jnp.sqrt(jnp.sum(adj_hist[0, :, :] ** 2)))
+        if grads[-1] <= tolerance:
             cfg.optim.Nopt = it + 1
             break
 
         if line_search_opt:
-            inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(), f_hist, adj_hist[0, :, :])
+            inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(), f_hist, f_exp, adj_hist[0, :, :], last_alpha=alpha)
         else:
-            inicond += adj_hist[0, :, :]
+            inicond += cfg.optim.lr * adj_hist[0, :, :]
             alpha = cfg.optim.lr
+
+        f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond)
         
         alphas.append(alpha)
-        plot_inicond(cfg, inicond, folder_it / f"inicond_{it:04d}.png")
+        plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp, folder_it / f"opt_{it:04d}.png")
 
-    plot_optimisation(cfg, inicond_initiale, inicond, residuals, folder / "result.tex")
-    plot_f_exp(cfg, folder / "f_exp.tex")
     make_anim_2d(cfg, f_hist, folder / "f_res.gif")
-
     print(alphas)
 
 

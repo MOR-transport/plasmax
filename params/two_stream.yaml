@@ -7,24 +7,26 @@ physics:
 interp:
   order: 3
 grid:
-  nx: 128  # 2^10
-  nv: 128
-  lx: 12.566370614359172  # 2*pi/k with k = 0.5
-  lv: 6
+  nx: 256  # 2^10
+  nv: 256
+  lx: 12.566370614359172   # 2*pi/k with k = 0.5
+  lv: 6.283185307179586  # 2*pi
 inicond:
   case: two_stream
   alpha: null
   eps: 0.05
   v0: 3
-  k: 0.2
+  k: 0.5
 time:
   nt_max: 4000
   dt: 0.1
   tend: 1
   plot_freq: 10
 optim:
-  fexp: gaussian
-  sigxv: gaussian
-  sigt: gate
-  lr: 10
-  Nopt: 100
+  case: landau_damping
+  k: 0.5
+  alpha: 0.01
+  filter_xv: ones
+  filter_t: ones
+  lr: 0.5
+  Nopt: 15
