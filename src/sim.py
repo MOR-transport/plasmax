@@ -12,6 +12,7 @@ from .inicond import get_inicond
 from .periodic_grid import make_periodic_grid
 from .predcorr import predictor_corrector_step
 from .physics import compute_density, vpoisson
+from .diagnostics import measure
 
 jax.config.update("jax_enable_x64", True)
 
@@ -219,6 +220,8 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
 
         f_hist = f_hist.at[it, :, :].set(f)
         Efield_hist = Efield_hist.at[it, :].set(Efield)
+        
+        measure(cfg, f, Efield, it)
 
         print(f"iter: {it}, time: {t:.6g}, dt: {cfg.time.dt:.6g}, "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
