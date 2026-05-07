@@ -161,5 +161,5 @@ def plot_errors(cfg):
     grid = make_periodic_grid(cfg.grid)
     cfg.grid = grid
 
-    #plot_time_error(cfg, src=maxwell_distrib, format="tex")
-    plot_space_error(cfg, src=maxwell_distrib, format="tex")
+    plot_time_error(cfg, format="png")
+    plot_space_error(cfg, format="png")

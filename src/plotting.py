@@ -14,7 +14,7 @@ from .config import Config
 def plot_solution(cfg, f: jnp.ndarray, t: float, fname: str) -> None:
     cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
-    pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, f, shading="auto")
+    pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, f, shading="auto", cmap='turbo')
     fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
     ax.set_xlabel(r"$x$")
     ax.set_ylabel(r"$v$")
@@ -33,7 +33,7 @@ def plot_solution(cfg, f: jnp.ndarray, t: float, fname: str) -> None:
 def plot_Efield(cfg, Efield: jnp.ndarray, t, fname: str) -> None:
     cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
-    plt.plot(cfg.grid.x, Efield)
+    ax.plot(cfg.grid.x, Efield)
     ax.set_xlabel(r"$x$")
     ax.set_title(f"Electric field at t = {t:.2f} ({cfg.inicond.case}) (Kn = {cfg.physics.knudsen:.0e})")
     fig.tight_layout()
@@ -80,6 +80,29 @@ def plot_profile(cfg, f_hist: jnp.ndarray, format="png", nb_profiles=3) -> None:
     plt.close(fig)
 
 
+def plot_energy(cfg, Efield_hist, format="png"):
+    cfg.grid = make_periodic_grid(cfg.grid)
+
+    energy = (1/2) * jnp.sum(Efield_hist ** 2, axis=1) * cfg.grid.dx
+
+    Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
+    t = jnp.linspace(0, cfg.time.tend, Nt)
+    
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.semilogy(t, energy)
+
+    ax.set_xlabel(r"$t$")
+    ax.set_ylabel(r"$\log E_{pe}$")
+    ax.set_title(f"Potential electrostatic energy (Kn = {cfg.physics.knudsen:.0e})")
+
+    folder = Path(f"plots/simulation/sim_default")
+    if format == "png":
+        fig.savefig(folder / "energy.png")
+    elif format == "tex":
+        save(folder / "energy.tex", encoding="utf-8")
+    plt.close(fig)
+
+
 def make_anim_1d(cfg, hist, fname):
     fig, ax = plt.subplots()
     frames = []
@@ -111,7 +134,7 @@ def make_anim_2d(cfg, hist, fname):
     limits = [0, cfg.grid.lx, -cfg.grid.lv, cfg.grid.lv]
 
     for frame_data in hist:
-        im = ax.imshow(frame_data, extent=limits, origin='lower', cmap='viridis', vmin=val_min, vmax=val_max, animated=True)
+        im = ax.imshow(frame_data, extent=limits, origin='lower', cmap='turbo', vmin=val_min, vmax=val_max, animated=True)
         frames.append([im])
 
     fig.colorbar(im, ax=ax, label='Valeur')
@@ -125,7 +148,7 @@ def make_anim_2d(cfg, hist, fname):
 def plot_source(cfg: Config, source, f: jnp.ndarray, fname):
     cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
-    pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, source(cfg, f), shading="auto")
+    pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, source(cfg, f), shading="auto", cmap='turbo')
     fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
     ax.set_xlabel(r"$x$")
     ax.set_ylabel(r"$v$")
@@ -143,7 +166,7 @@ def plot_source(cfg: Config, source, f: jnp.ndarray, fname):
 def plot_inicond(cfg, inicond: jnp.ndarray, fname: str) -> None:
     cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
-    pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, inicond, shading="auto")
+    pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, inicond, shading="auto", cmap='turbo')
     fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
     ax.set_xlabel(r"$x$")
     ax.set_ylabel(r"$v$")
@@ -156,6 +179,7 @@ def plot_inicond(cfg, inicond: jnp.ndarray, fname: str) -> None:
             save(fname, encoding="utf-8")
     else:
         plt.show()
+    plt.close(fig)
 
 
 def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
@@ -182,8 +206,8 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     axs[0][2].set_title(r"Evolution of $\alpha$")
     axs[0][2].set_xticks(iterations)
 
-    vmin = jnp.min(f_exp)
-    vmax = jnp.max(f_exp)
+    vmin = jnp.min(f_exp[-1, :, :])
+    vmax = jnp.max(f_exp[-1, :, :])
 
     pcm_inicond = axs[1][0].pcolormesh(cfg.grid.X, cfg.grid.V, inicond, shading="auto", cmap='turbo', vmin=vmin, vmax=vmax) # norm=mcolors.PowerNorm(gamma=0.3, vmin=vmin, vmax=vmax))
     pcm_f = axs[1][1].pcolormesh(cfg.grid.X, cfg.grid.V, f[-1, :, :], shading="auto", cmap='turbo', vmin=vmin, vmax=vmax) # norm=mcolors.PowerNorm(gamma=0.3, vmin=vmin, vmax=vmax))
@@ -206,7 +230,12 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     axs[1][2].set_title(r"Function $f^{exp}$")
 
     fig.tight_layout()
+
     if fname is not None:
-        fig.savefig(fname)
+        if str(fname)[-3:] == "png":
+            fig.savefig(fname)
+        elif str(fname)[-3:] == "tex":
+            save(fname, encoding="utf-8")
+        plt.close(fig)
     else:
         plt.show()

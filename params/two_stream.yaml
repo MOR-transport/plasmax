@@ -13,14 +13,13 @@ grid:
   lv: 6.283185307179586  # 2*pi
 inicond:
   case: two_stream
-  alpha: null
-  eps: 0.05
+  eps: 0.5
   v0: 3
-  k: 0.5
+  k: 1
 time:
   nt_max: 4000
   dt: 0.1
-  tend: 1
+  tend: 20
   plot_freq: 10
 optim:
   case: landau_damping
@@ -28,5 +27,5 @@ optim:
   alpha: 0.01
   filter_xv: ones
   filter_t: ones
-  lr: 0.5
-  Nopt: 15
+  lr: 1.25
+  Nopt: 20

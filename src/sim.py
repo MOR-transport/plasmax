@@ -11,7 +11,7 @@ from .periodic_grid import make_periodic_grid
 from .predcorr import predictor_corrector_step
 from .physics import compute_density, vpoisson
 from .source import maxwell_distrib
-from .plotting import plot_solution, plot_Efield, plot_profile, plot_inicond, make_anim_1d, make_anim_2d
+from .plotting import plot_solution, plot_Efield, plot_profile, plot_inicond, plot_energy
 
 jax.config.update("jax_enable_x64", True)
 
@@ -102,4 +102,5 @@ def simulate(cfg) -> None:
 
     f_hist, Efield_hist = run_time_loop(cfg, src=maxwell_distrib, format="png")
     plot_profile(cfg, f_hist, format="png", nb_profiles=3)
+    plot_energy(cfg, Efield_hist)
 

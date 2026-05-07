@@ -60,30 +60,34 @@ def run_time_loop_adjoint(cfg, Efield, src):
     return f_hist
 
 
-def line_search(cfg, inicond, f, fexp, adj, m=1e-4, theta=0.5, last_alpha=1.25):
-    if last_alpha is None:
-        alpha = 1.25
-    else: 
-        alpha = last_alpha
-    J = lambda f: functionnal(cfg, f, fexp)
+def line_search_step(cfg, alpha, inicond, adj):
 
-    while True:
-        inicond_tmp = inicond + alpha * adj
+    inicond_tmp = inicond + alpha * adj
+    f_new, Efield_new = run_time_loop(cfg, inicond=inicond_tmp)
 
-        f_new, Efield_new = run_time_loop(cfg, inicond=inicond_tmp)
-        armijo_cond = J(f_new) <= J(f) - m*alpha*jnp.sum(adj**2)
-
-        if armijo_cond:
-            return inicond_tmp, f_new, Efield_new, alpha
-        alpha *= theta
-
-        if alpha < 1e-3:
-            break
-    
     return inicond_tmp, f_new, Efield_new, alpha
 
 
-def adjoint(cfg, line_search_opt=True, tolerance=0.01):
+def line_search(cfg, inicond, f, fexp, adj, big_alpha, m=1e-4, theta=0.5):
+    alpha = big_alpha
+    
+    if alpha <= 1e-8:
+        return line_search_step(cfg, alpha, inicond, adj)
+    
+    J = lambda f: functionnal(cfg, f, fexp)
+    while True:
+        inicond_tmp, f_new, Efield_new, alpha = line_search_step(cfg, alpha, inicond, adj)
+        
+        armijo_cond = J(f_new) <= J(f) - m*alpha*jnp.sum(adj**2)
+        if armijo_cond:
+            return inicond_tmp, f_new, Efield_new, alpha
+        
+        alpha *= theta
+        if alpha <= 1e-8:
+            return line_search_step(cfg, alpha, inicond, adj)
+
+
+def adjoint(cfg, line_search_opt=True, tolerance=0.0001, format="png"):
     cfg.grid = make_periodic_grid(cfg.grid)
     cfg.time.plot_freq = 0
 
@@ -94,7 +98,6 @@ def adjoint(cfg, line_search_opt=True, tolerance=0.01):
     inicond = inicond_initiale.copy()
     residuals = []
     alphas = []
-    alpha = None
     grads = []
 
     folder = Path(f"plots/optimization/default_optim/")
@@ -121,15 +124,14 @@ def adjoint(cfg, line_search_opt=True, tolerance=0.01):
             break
 
         if line_search_opt:
-            inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(), f_hist, f_exp, adj_hist[0, :, :], last_alpha=alpha)
+            inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(), f_hist, f_exp, adj_hist[0, :, :], cfg.optim.lr)
         else:
             inicond += cfg.optim.lr * adj_hist[0, :, :]
             alpha = cfg.optim.lr
-
-        f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond)
+            f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond)
         
         alphas.append(alpha)
-        plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp, folder_it / f"opt_{it:04d}.png")
+        plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp, folder_it / f"opt_{it:04d}.{format}")
 
     make_anim_2d(cfg, f_hist, folder / "f_res.gif")
     print(alphas)
@@ -141,4 +143,4 @@ def optimize(cfg):
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
 
-    adjoint(cfg, line_search_opt=True)
+    adjoint(cfg, line_search_opt=True, format="png")
