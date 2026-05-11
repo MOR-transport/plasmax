@@ -49,3 +49,36 @@ python main.py
 python main.py params/two_stream.yaml
 ```
 
+## Diagonstics and Plotting
+
+After running a simulation, you can automatically generate plots (png and tikz formats) from the `diagnostics.csv` data using the `plasmax-diags` CLI tool.
+
+- **Basic usage (plots all quantities by default):**
+
+```bash
+plasmax-diags --params params/two_stream.yaml
+```
+
+- **Plots specific quantities :**
+You can select specific physical quantities using their respective flags (--epot, --ekin, --etot, --mass, --momentum, --l2norm).
+eg :
+
+```bash
+plasmax-diags --params params/two_stream.yaml --epot --mass
+```
+
+- **Compare multiple runs:**
+Pass multiple YAML parameter files to plot data from different simulations on the same figure. The output file will automatically combine the case names
+eg :
+
+```bash
+plasmax-diags --params params/two_stream1.yaml params/two_stream2.yaml --epot
+```
+
+- **Format and Output options:**
+By default, the tool produces both .png and .tex (TikZ) files in the corresponding results/<case_name> directory. You can override this behavior using the --format and --output-dir arguments.
+eg :
+
+```bash
+plasmax-diags --params params/two_stream.yaml --format png
+```
