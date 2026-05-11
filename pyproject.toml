@@ -13,6 +13,8 @@ dependencies = [
     # NVIDIA GPU wheels are published for Linux only (see JAX docs). Elsewhere: CPU jaxlib.
     "jax[cuda12]>=0.4.28; sys_platform == 'linux'",
     "jax>=0.4.28; sys_platform != 'linux'",
+    "tikzplotlib",
+    "webcolors>=1.13",
 ]
 
 [project.optional-dependencies]
@@ -21,6 +23,10 @@ cuda13 = ["jax[cuda13]>=0.4.28"]
 
 [project.scripts]
 plasma-sim = "src.sim:simulate"
+plasmax-diags = "src.diags:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]  
 
 [tool.hatch.build.targets.wheel.force-include]
 "params" = "params"
