@@ -58,6 +58,12 @@ class Interp:
 
     order: int = 3
 
+@dataclass 
+class Restart:
+    """Configuration for restarting from a saved state"""
+    enabled: bool = False 
+    file: str | None = None 
+    time: float = 0.0
 
 @dataclass
 class Config:
@@ -67,11 +73,15 @@ class Config:
     method: str = "predcorr"
     physics: Physics = field(default_factory=Physics)
     interp: Interp = field(default_factory=Interp)
-
+    restart: Restart = field(default_factory=Restart)
 
 def load_config(path: str | Path) -> Config:
     with open(path, encoding="utf-8") as f:
         data: dict[str, Any] = yaml.safe_load(f)
+    
+    # manage the restart section (may be absent)
+    restart_data = data.get("restart", {})
+    restart = Restart(**restart_data) if restart_data else Restart()
 
     return Config(
         inicond=IniCond(**data["inicond"]),
@@ -80,4 +90,5 @@ def load_config(path: str | Path) -> Config:
         method=str(data.get("method", "predcorr")),
         physics=Physics(**(data.get("physics") or {})),
         interp=Interp(**(data.get("interp") or data.get("opt_interp") or {})),
+        restart=restart
     )

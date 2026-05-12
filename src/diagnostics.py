@@ -2,15 +2,16 @@ import os
 import csv 
 import jax.numpy as jnp 
 from .config import Config
+from pathlib import Path
 
-def measure(cfg: Config, f: jnp.ndarray, Efield: jnp.ndarray, it: int):
-    """Calculates and saves the physical quantities of the simulation at iteration 'it'  """
+def measure(cfg: Config, f: jnp.ndarray, Efield: jnp.ndarray, it: int, t_actual: float):
+    """Calculates and saves the physical quantities of the simulation"""
     save_dir = f"results/{cfg.inicond.case}"  
     os.makedirs(save_dir, exist_ok=True) 
     
     diag_file_path = f"{save_dir}/diagnostics.csv" 
     
-    t = it * cfg.time.dt 
+    t = t_actual
     dx = cfg.grid.dx 
     dv = cfg.grid.dv
     dxdv = dx * dv
@@ -40,4 +41,11 @@ def measure(cfg: Config, f: jnp.ndarray, Efield: jnp.ndarray, it: int):
         if not file_exists:
             writer.writeheader()
         writer.writerow(data)
+        
+
+def save_distribution(f: jnp.ndarray, filepath: Path) -> None:
+    """Save the distribution function f to a .npy file"""
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    jnp.save(filepath, f)
+    print(f"Saved distribution function to {filepath}")
     

@@ -4,6 +4,7 @@ results/
 *.csv
 *.png
 *.tex
+*.npy
 
 .venv/
 
