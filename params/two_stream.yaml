@@ -9,23 +9,24 @@ interp:
 grid:
   nx: 256  # 2^10
   nv: 256
-  lx: 12.566370614359172   # 2*pi/k with k = 0.5
-  lv: 6.283185307179586  # 2*pi
+  lx: 31.41592653589793   # 2*pi/k with k = 0.2
+  lv: 15.707963267948966  # 2*pi
 inicond:
   case: two_stream
-  eps: 0.5
+  eps: 0.05
   v0: 3
-  k: 1
+  k: 0.5
 time:
   nt_max: 4000
-  dt: 0.1
-  tend: 20
-  plot_freq: 10
+  dt: 1.5
+  tend: 15
+  plot_freq: 1
 optim:
-  case: landau_damping
-  k: 0.5
-  alpha: 0.01
+  target: two_stream
+  eps: 0.05
+  v0: 3
+  k: 0.2
   filter_xv: ones
   filter_t: ones
-  lr: 1.25
+  lr: 0.25
   Nopt: 20

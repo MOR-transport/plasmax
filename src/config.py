@@ -64,7 +64,7 @@ class Interp:
 
 @dataclass
 class Optim:
-    case: str
+    target: str
     k: float | None = None
     alpha: float | None = None
     eps: float | None = None

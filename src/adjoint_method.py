@@ -76,6 +76,8 @@ def line_search(cfg, inicond, f, fexp, adj, big_alpha, m=1e-4, theta=0.5):
     
     J = lambda f: functionnal(cfg, f, fexp)
     while True:
+        print(f"\nTRY ALPHA = {alpha}")
+
         inicond_tmp, f_new, Efield_new, alpha = line_search_step(cfg, alpha, inicond, adj)
         
         armijo_cond = J(f_new) <= J(f) - m*alpha*jnp.sum(adj**2)
@@ -104,7 +106,7 @@ def adjoint(cfg, line_search_opt=True, tolerance=0.0001, format="png"):
     folder_it = folder / "iterations"
 
     if folder.exists() and folder.is_dir():
-            shutil.rmtree(folder)
+        shutil.rmtree(folder)
 
     folder_it.mkdir(parents=True)
 

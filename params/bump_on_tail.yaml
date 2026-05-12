@@ -23,7 +23,7 @@ time:
   tend: 10
   plot_freq: 10
 optim:
-  case: two_stream
+  target: two_stream
   eps: 0.05
   v0: 3
   k: 0.5

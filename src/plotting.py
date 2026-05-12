@@ -4,11 +4,20 @@ from pathlib import Path
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import matplotlib.colors as mcolors
 from tikzplotlib import save
 
 from .periodic_grid import make_periodic_grid
 from .config import Config
+
+
+import scienceplots
+plt.style.use(['science'])
+
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.size": 22,
+})
 
 
 def plot_solution(cfg, f: jnp.ndarray, t: float, fname: str) -> None:
@@ -190,20 +199,20 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     iterations = jnp.arange(1, len(residual)+1)
     axs[0][0].semilogy(iterations, residual, "x-")
     axs[0][0].set_xlabel("Iteration")
-    axs[0][0].set_ylabel("Residual")
-    axs[0][0].set_title("Evolution of residuals")
+    axs[0][0].set_ylabel(r"$\log J(f) $")
+    axs[0][0].set_title(r"Evolution of the functional $ J(f) $")
     axs[0][0].set_xticks(iterations)
 
-    axs[0][1].plot(iterations, grad, "x-")
+    axs[0][1].semilogy(iterations, grad, "x-")
     axs[0][1].set_xlabel("Iteration")
-    axs[0][1].set_ylabel(r"$\left\| \nabla J(f) \right\|$")
-    axs[0][1].set_title(r"Evolution of $\left\| \nabla J(f) \right\|$")
+    axs[0][1].set_ylabel(r"$\log \left\| \nabla J(f) \right\|$")
+    axs[0][1].set_title(r"Evolution of the gradient $\left\| \nabla J(f) \right\|$")
     axs[0][1].set_xticks(iterations)
 
     axs[0][2].plot(iterations, alphas, "x-")
     axs[0][2].set_xlabel("Iteration")
     axs[0][2].set_ylabel(r"$\alpha$")
-    axs[0][2].set_title(r"Evolution of $\alpha$")
+    axs[0][2].set_title(r"Evolution of the optimization step $\alpha$")
     axs[0][2].set_xticks(iterations)
 
     vmin = jnp.min(f_exp[-1, :, :])
@@ -219,7 +228,7 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
 
     axs[1][0].set_xlabel(r"$x$")
     axs[1][0].set_ylabel(r"$v$")
-    axs[1][0].set_title("Intiale condition")
+    axs[1][0].set_title("Initial condition")
 
     axs[1][1].set_xlabel(r"$x$")
     axs[1][1].set_ylabel(r"$v$")
