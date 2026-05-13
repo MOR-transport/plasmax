@@ -201,8 +201,12 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
         restart_path = Path(cfg.restart.file) 
         if not restart_path.exists():
             raise FileNotFoundError(f"Restart file '{restart_path}' not found.")
-        f = jnp.load(restart_path)
-        t = cfg.restart.time
+        
+        #loading .npz archive
+        data = jnp.load(restart_path)
+        f = data['f']
+        t = float(data["t"])
+        it_offset = int(data["it"])
         
         #check the compatibility of the dimensions
         if f.shape != (grid.nv, grid.nx):
@@ -214,6 +218,7 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
         f0 = get_inicond(cfg)
         f = f0(grid.X, grid.V)
         t = 0.0
+        it_offset = 0 #no offset if we start at 0
         print(f"Starting from analytical initial condition")
         
     rho = compute_density(f, grid.dv)
@@ -237,9 +242,7 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     Efield_hist = jnp.empty((nt_cap+1, grid.nx), dtype=jnp.float64)
     Efield_hist = Efield_hist.at[0, :].set(Efield)
     
-    it_offset = 0
-    if cfg.restart.enabled:
-        it_offset = int(round(cfg.restart.time / cfg.time.dt))
+    global_it = it_offset 
 
     for it in range(1, nt_cap + 1):
 
@@ -279,16 +282,17 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
         axs[1].legend()
         fig.savefig(f"plots/profile.png")
     
-    # save final distribution function to a .npy file    
-    save_path = Path(f"results/{cfg.inicond.case}") / "f_final.npy"
+    # save final distribution function and time to an .npz archive    
+    save_path = Path(f"results/{cfg.inicond.case}") / "f_final.npz"
     save_path.parent.mkdir(parents=True, exist_ok=True)
-    jnp.save(save_path, f)
-    print(f"Saved final distribution function to {save_path}")
+    jnp.savez(save_path, f=f, t=t, it=global_it)
+    print(f"Save state (f,t,it) to {save_path}")
 
     return f_hist, Efield_hist
 
 
 def simulate() -> None:
+    
     parser = argparse.ArgumentParser(description="Vlasov–Poisson driver (predcorr / NuFI stub).")
     parser.add_argument(
         "config",

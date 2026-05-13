@@ -23,5 +23,4 @@ time:
   plot_freq: 0
 restart:
   enabled: true
-  file: results/two_stream/f_final.npy
-  time: 40.0 
+  file: results/two_stream/f_final.npz
