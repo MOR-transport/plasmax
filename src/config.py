@@ -62,8 +62,7 @@ class Interp:
 class Restart:
     """Configuration for restarting from a saved state"""
     enabled: bool = False 
-    file: str | None = None 
-    time: float = 0.0
+    file: str | None = None
 
 @dataclass
 class Config:
