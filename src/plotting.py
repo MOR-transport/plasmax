@@ -209,6 +209,9 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     axs[0][1].set_title(r"Evolution of the gradient $\left\| \nabla J(f) \right\|$")
     axs[0][1].set_xticks(iterations)
 
+    if jnp.isscalar(alphas):
+        alphas = jnp.full(iterations.shape, alphas)
+
     axs[0][2].plot(iterations, alphas, "x-")
     axs[0][2].set_xlabel("Iteration")
     axs[0][2].set_ylabel(r"$\alpha$")

@@ -127,16 +127,14 @@ def adjoint(cfg, line_search_opt=True, tolerance=0.0001, format="png"):
 
         if line_search_opt:
             inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(), f_hist, f_exp, adj_hist[0, :, :], cfg.optim.lr)
+            alphas.append(alpha)
+            plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp, folder_it / f"opt_{it:04d}.{format}")
         else:
             inicond += cfg.optim.lr * adj_hist[0, :, :]
-            alpha = cfg.optim.lr
             f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond)
-        
-        alphas.append(alpha)
-        plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp, folder_it / f"opt_{it:04d}.{format}")
+            plot_optimisation(cfg, residuals, grads, cfg.optim.lr, inicond, f_hist, f_exp, folder_it / f"opt_{it:04d}.{format}")
 
     make_anim_2d(cfg, f_hist, folder / "f_res.gif")
-    print(alphas)
 
 
 def optimize(cfg):
