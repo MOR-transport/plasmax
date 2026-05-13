@@ -25,7 +25,7 @@ def maxwell_distrib(cfg: Config, f: jnp.ndarray) -> jnp.ndarray:
     return (MF - f) / cfg.physics.knudsen
 
 
-def gaussian_xv(cfg, a=10):    
+def gaussian_xv(cfg, a=5):    
     v_col = cfg.grid.v[:, None]
     res = (1 / (2*jnp.pi)) * jnp.exp((-v_col**2) / 2*a)
     return jnp.broadcast_to(res, (cfg.grid.nv, cfg.grid.nx))[None, :, :]
@@ -60,29 +60,27 @@ def compute_src(cfg, f_hist, fexp):
 
 
 def get_filters_exp(cfg):
+    filter_xv_dic = {
+        "gaussian_xv": gaussian_xv,
+        "disk_xv": disk_xv,
+        "ones": ones,
+    }
+    filter_t_dic = {
+        "tanh_t": tanh_t,
+        "gate_t": gate_t,
+        "ones": ones,
+    }
 
-    if cfg.optim.filter_xv == "gaussian_xv":
-        sigxv = gaussian_xv(cfg)
-        
-    elif cfg.optim.filter_xv == "disk_xv":
-        sigxv = disk_xv(cfg)
-    
-    elif cfg.optim.filter_xv == "ones":
-        sigxv = ones(cfg)
+    try:
+        func_xv = filter_xv_dic[cfg.optim.filter_xv]
+        sigxv = func_xv(cfg)
+    except KeyError:
+        raise ValueError(f"Unknown optim.filter_xv: {cfg.optim.filter_xv!r}")
 
-    else:
-        raise ValueError(f"Unknown optim.filter_xv.: {cfg.optim.filter_xv!r}")
-    
-    if cfg.optim.filter_t == "tanh_t":
-        sigt = tanh_t(cfg)
-        
-    elif cfg.optim.filter_t == "gate_t":
-        sigt = gate_t(cfg)
+    try:
+        func_t = filter_t_dic[cfg.optim.filter_t]
+        sigt = func_t(cfg)
+    except KeyError:
+        raise ValueError(f"Unknown optim.filter_t: {cfg.optim.filter_t!r}")
 
-    elif cfg.optim.filter_t == "ones":
-        sigt = ones(cfg)
-
-    else:
-        raise ValueError(f"Unknown optim.filter_xv.: {cfg.optim.filter_t!r}")
-    
     return sigxv, sigt
