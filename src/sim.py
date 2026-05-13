@@ -31,6 +31,7 @@ def plot_solution(cfg, f: jnp.ndarray,fname: str) -> None:
     fig.tight_layout()
     if fname is not None:
         fig.savefig(fname)
+        plt.close(fig)
     else:
         plt.show()
 
@@ -43,6 +44,7 @@ def plot_Efield(cfg, Efield: jnp.ndarray,fname: str) -> None:
     fig.tight_layout()
     if fname is not None:
         fig.savefig(fname)
+        plt.close(fig)
     else:
         plt.show()
 
@@ -193,13 +195,42 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     """Advance ``f`` until ``time >= cfg.time.tend`` or ``nt_max`` steps."""
     grid = make_periodic_grid(cfg.grid)
     cfg.grid = grid
-    f0 = get_inicond(cfg)
-    f = f0(grid.X, grid.V)
-    t = 0.0
+    
+    # f and t initialization 
+    if cfg.restart.enabled and cfg.restart.file:
+        restart_path = Path(cfg.restart.file) 
+        if not restart_path.exists():
+            raise FileNotFoundError(f"Restart file '{restart_path}' not found.")
+        
+        #loading .npz archive
+        data = jnp.load(restart_path)
+        f = data['f']
+        t = float(data["t"])
+        it_offset = int(data["it"])
+        
+        #check the compatibility of the dimensions
+        if f.shape != (grid.nv, grid.nx):
+            raise ValueError(f"Restart file shape {f.shape} != grid shape ({grid.nv}, {grid.nx})")
+        
+        print(f"Restarting from {restart_path} at t = {t:.6g}")
+    
+    else:
+        f0 = get_inicond(cfg)
+        f = f0(grid.X, grid.V)
+        t = 0.0
+        it_offset = 0 #no offset if we start at 0
+        print(f"Starting from analytical initial condition")
+        
     rho = compute_density(f, grid.dv)
     Efield = vpoisson(rho, grid, cfg.physics.charge)
 
-    nt_cap = min(cfg.time.nt_max, int(math.ceil(cfg.time.tend / cfg.time.dt)))
+    #number of iterations from the initial time
+    remaining = max(0.0, cfg.time.tend - t)
+    nt_cap = min(cfg.time.nt_max, int(math.ceil(remaining / cfg.time.dt)))
+    if nt_cap <=0: 
+        print("Nothing to simulate (tend already reached).")
+        return jnp.empty((0, grid.nv, grid.nx)), jnp.empty((0, grid.nx))        
+    
     tcpu = []
 
     if nb_profile > 0:
@@ -210,10 +241,13 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
 
     Efield_hist = jnp.empty((nt_cap+1, grid.nx), dtype=jnp.float64)
     Efield_hist = Efield_hist.at[0, :].set(Efield)
+    
+    global_it = it_offset 
 
     for it in range(1, nt_cap + 1):
 
         t0 = time_module.perf_counter()
+        global_it = it + it_offset
         f, Efield = step(f, cfg, t)
         t += cfg.time.dt
         tcpu.append(time_module.perf_counter() - t0)
@@ -221,7 +255,7 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
         f_hist = f_hist.at[it, :, :].set(f)
         Efield_hist = Efield_hist.at[it, :].set(Efield)
         
-        measure(cfg, f, Efield, it)
+        measure(cfg, f, Efield, global_it, t)
 
         print(f"iter: {it}, time: {t:.6g}, dt: {cfg.time.dt:.6g}, "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
@@ -247,11 +281,18 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
         axs[0].legend()
         axs[1].legend()
         fig.savefig(f"plots/profile.png")
+    
+    # save final distribution function and time to an .npz archive    
+    save_path = Path(f"results/{cfg.inicond.case}") / "f_final.npz"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    jnp.savez(save_path, f=f, t=t, it=global_it)
+    print(f"Save state (f,t,it) to {save_path}")
 
     return f_hist, Efield_hist
 
 
 def simulate() -> None:
+    
     parser = argparse.ArgumentParser(description="Vlasov–Poisson driver (predcorr / NuFI stub).")
     parser.add_argument(
         "config",
