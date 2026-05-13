@@ -22,3 +22,5 @@ time:
   dt: 0.2
   tend: 40
   plot_freq: 10
+io:
+  save_dir: null

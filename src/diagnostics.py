@@ -1,15 +1,14 @@
-import os 
-import csv 
+import csv
 import jax.numpy as jnp 
 from .config import Config
 from pathlib import Path
 
 def measure(cfg: Config, f: jnp.ndarray, Efield: jnp.ndarray, it: int, t_actual: float):
     """Calculates and saves the physical quantities of the simulation"""
-    save_dir = f"results/{cfg.inicond.case}"  
-    os.makedirs(save_dir, exist_ok=True) 
-    
-    diag_file_path = f"{save_dir}/diagnostics.csv" 
+    data_dir = cfg.paths.data_dir
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    diag_file_path = data_dir / "diagnostics.csv" 
     
     t = t_actual
     dx = cfg.grid.dx 
@@ -35,8 +34,8 @@ def measure(cfg: Config, f: jnp.ndarray, Efield: jnp.ndarray, it: int, t_actual:
         "momentum": float(momentum)
     }
     
-    file_exists = os.path.isfile(diag_file_path)
-    with open(diag_file_path, mode='a', newline='') as file: 
+    file_exists = diag_file_path.is_file()
+    with open(diag_file_path, mode="a", newline="") as file: 
         writer = csv.DictWriter(file, fieldnames=data.keys())
         if not file_exists:
             writer.writeheader()

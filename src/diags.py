@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING 
 
 import matplotlib.pyplot as plt
-import yaml 
+
+from .config import load_config
 
 if TYPE_CHECKING:
     import matplotlib as mpl 
@@ -72,11 +73,6 @@ def load_diagnostics(csv_path: Path) -> tuple[list[float], dict[str, list[float]
     
     return times, data
 
-def get_case_name(params_path: Path) -> str:
-    """extract case name from yaml file."""
-    with open(params_path, "r") as f:
-        config = yaml.safe_load(f)
-    return config["inicond"]["case"]
 
 def save_figure(fig: plt.Figure, output_path: Path, fmt: str = "both"):
     """save figure in png and/or tikz format."""
@@ -141,10 +137,11 @@ def main():
         if not params_path.exists():
             print(f"Warning: Params file '{params_path}' not found. Skipping.")
             continue
-        
-        case_name = get_case_name(params_path)
-        result_dir = args.output_dir or f"results/{case_name}"
-        csv_path = Path(result_dir) / "diagnostics.csv"
+
+        cfg = load_config(params_path)
+        case_name = cfg.inicond.case
+        csv_path = cfg.paths.data_dir / "diagnostics.csv"
+        figure_dir = Path(args.output_dir) if args.output_dir else cfg.paths.plot_dir
         
         if not csv_path.exists():
             print(f"Warning: {csv_path} not found for {case_name}. Run simulation first.")
@@ -203,7 +200,7 @@ def main():
             case_names = "_".join([c["name"] for c in cases_data])
             filename = f"{quantity}_{case_names}"
         
-        output_path = Path(cases_data[0]["csv_path"]).parent / filename
+        output_path = figure_dir / filename
         save_figure(fig, output_path, args.format)
         plt.close(fig)
     

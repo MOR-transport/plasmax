@@ -109,7 +109,8 @@ def plot_time_error(cfg):
 
     ax.legend()
     ax.grid(True, which="both")
-    fig.savefig(f"plots/time_error.png")
+    cfg.paths.plot_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(cfg.paths.plot_dir / "time_error.png")
 
     cfg.time.dt = dt_backup
 
@@ -171,7 +172,8 @@ def plot_space_error(cfg):
 
     ax.legend()
     ax.grid(True, which="both")
-    fig.savefig(f"plots/space_error.png")
+    cfg.paths.plot_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(cfg.paths.plot_dir / "space_error.png")
 
     cfg.grid.nx = nxv_backup
     cfg.grid.nv = nxv_backup
@@ -236,6 +238,8 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     if nb_profile > 0:
         fig, axs = plt.subplots(2, 1, figsize=(16, 10))
 
+    cfg.paths.plot_dir.mkdir(parents=True, exist_ok=True)
+
     f_hist = jnp.empty((nt_cap+1, grid.nv, grid.nx), dtype=jnp.float64)
     f_hist = f_hist.at[0, :, :].set(f)
 
@@ -259,8 +263,8 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
 
         print(f"iter: {it}, time: {t:.6g}, dt: {cfg.time.dt:.6g}, "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
-            plot_solution(cfg, f, f"plots/solution_{it:04d}.png")
-            plot_Efield(cfg, Efield, f"plots/Efield_{it:04d}.png")
+            plot_solution(cfg, f, str(cfg.paths.plot_dir / f"solution_{it:04d}.png"))
+            plot_Efield(cfg, Efield, str(cfg.paths.plot_dir / f"Efield_{it:04d}.png"))
         if nb_profile > 0:
             if cfg.time.plot_freq > 0 and it % ((nt_cap-2) // nb_profile) == 0:
                 plot_profile(cfg, f, t, axs)
@@ -280,10 +284,10 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     if nb_profile > 0:
         axs[0].legend()
         axs[1].legend()
-        fig.savefig(f"plots/profile.png")
-    
-    # save final distribution function and time to an .npz archive    
-    save_path = Path(f"results/{cfg.inicond.case}") / "f_final.npz"
+        fig.savefig(cfg.paths.plot_dir / "profile.png")
+
+    # save final distribution function and time to an .npz archive
+    save_path = cfg.paths.data_dir / "f_final.npz"
     save_path.parent.mkdir(parents=True, exist_ok=True)
     jnp.savez(save_path, f=f, t=t, it=global_it)
     print(f"Save state (f,t,it) to {save_path}")
