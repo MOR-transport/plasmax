@@ -18,13 +18,13 @@ def two_stream(x, v, k: float, eps: float, v0: float) -> jnp.ndarray:
 def get_inicond(cfg: Config):
     ic = cfg.inicond
 
-    if ic.case == "landau_damping":
+    if ic.case.startswith("landau_damping"):
         if ic.alpha is None or ic.k is None:
             raise ValueError("landau_damping requires inicond.alpha and inicond.k")
         alpha, k = ic.alpha, ic.k
         return lambda x, v: landau_damping(x, v, alpha, k)
         
-    if ic.case == "two_stream":
+    if ic.case.startswith("two_stream"):
         if ic.k is None or ic.eps is None or ic.v0 is None:
             raise ValueError("two_stream requires inicond.k, inicond.eps, and inicond.v0")
         k, eps, v0 = ic.k, ic.eps, ic.v0
