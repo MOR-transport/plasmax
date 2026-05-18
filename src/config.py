@@ -70,7 +70,7 @@ class Restart:
 class IoConfig:
     save_dir: str | None = None 
     compression_method: str | None = None 
-    dt_compress: float | None = None 
+    dt_save: float | None = None 
     restart: Restart = field(default_factory=Restart) 
 
 
@@ -132,7 +132,7 @@ def load_config(path: str | Path) -> Config:
     io_cfg = IoConfig(
         save_dir=io_data.get("save_dir"),
         compression_method=io_data.get("compression_method"),
-        dt_compress=io_data.get("dt_compress"),
+        dt_save=io_data.get("dt_save"),
         restart=restart
     )
     

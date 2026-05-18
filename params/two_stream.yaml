@@ -33,7 +33,7 @@ optim:
 io:
   save_dir: null
   compression_method: POD 
-  dt_compress: 5.0
+  dt_save: 5.0
   restart:
     enabled: false
     file: null
