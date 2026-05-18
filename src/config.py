@@ -58,8 +58,31 @@ class Physics:
 @dataclass
 class Interp:
     """Advection interpolation settings (e.g. Lagrange ``order``)."""
-
     order: int = 3
+
+@dataclass 
+class Restart:
+    """Configuration for restarting from a saved state"""
+    enabled: bool = False 
+    file: str | None = None
+
+
+@dataclass(frozen=True)
+class Paths:
+    """
+    Sets up the paths <save_dir> as root:
+    - plot_dir: <save_dir>/plots
+    - data_dir: <save_dir>/data
+    """
+
+    save_dir: Path
+    plot_dir: Path
+    data_dir: Path
+
+    @classmethod
+    def from_case(cls, case: str, save_dir: str | Path | None = None) -> Paths:
+        save = Path(save_dir) if save_dir is not None else Path("results") / case
+        return cls(save_dir=save, plot_dir=save / "plots", data_dir=save / "data")
 
 
 @dataclass
@@ -84,21 +107,33 @@ class Config:
     grid: Grid
     time: Time
     optim: Optim
+    paths: Paths
     method: str = "predcorr"
     physics: Physics = field(default_factory=Physics)
     interp: Interp = field(default_factory=Interp)
+    restart: Restart = field(default_factory=Restart)
 
 
 def load_config(path: str | Path) -> Config:
     with open(path, encoding="utf-8") as f:
         data: dict[str, Any] = yaml.safe_load(f)
+    
+    # manage the restart section (may be absent)
+    restart_data = data.get("restart", {})
+    restart = Restart(**restart_data) if restart_data else Restart()
+
+    inicond = IniCond(**data["inicond"])
+    save_dir = (data.get("io") or {}).get("save_dir")
+    paths = Paths.from_case(inicond.case, save_dir)
 
     return Config(
-        inicond=IniCond(**data["inicond"]),
+        inicond=inicond,
         grid=Grid(**data["grid"]),
         time=Time(**data["time"]),
+        paths=paths,
         method=str(data.get("method", "predcorr")),
         physics=Physics(**(data.get("physics") or {})),
         interp=Interp(**(data.get("interp") or data.get("opt_interp") or {})),
         optim=Optim(**data["optim"])
+        restart=restart,
     )

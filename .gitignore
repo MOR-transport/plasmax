@@ -1,2 +1,35 @@
-**__pycache**
+**__pycache__
 plots/
+results/
+*.csv
+*.png
+*.tex
+*.npy
+
+.venv/
+
+# Compiled JAX files
+*.jax*
+
+# temporary files
+*.tmp
+*.log
+*.out
+
+# IDE 
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Mac
+.DS_Store
+
+# Python compilation files
+*.pyc
+*.pyo
+__pycache__/
+
+# Backup files
+*~
+*.bak

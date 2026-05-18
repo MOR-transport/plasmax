@@ -1,0 +1,29 @@
+method: predcorr
+# Output root; default results/<inicond.case>. Plots and diagnostics use save_dir/plots and save_dir/data.
+io:
+  save_dir: null
+physics:
+  charge: -1.0
+  mass: 1.0
+  knudsen: 1
+interp:
+  order: 3
+grid:
+  nx: 1024
+  nv: 1024
+  lx: 31.41592653589793
+  lv: 15.707963267948966
+inicond:
+  case: two_stream
+  alpha: null
+  eps: 0.05
+  v0: 3
+  k: 0.2
+time:
+  nt_max: 4000
+  dt: 0.2
+  tend: 80
+  plot_freq: 0
+restart:
+  enabled: true
+  file: results/two_stream/data/f_final.npz
