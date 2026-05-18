@@ -4,6 +4,11 @@ from pathlib import Path
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+
+#compatibility patch for tikzplotlib
+import matplotlib.backends.backend_pgf as backend_pgf
+if not hasattr(backend_pgf, "common_texification") and hasattr(backend_pgf, "_tex_escape"):
+    backend_pgf.common_texification = backend_pgf._tex_escape
 from tikzplotlib import save
 
 from .periodic_grid import make_periodic_grid

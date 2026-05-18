@@ -30,8 +30,8 @@ def main():
         
     current_time = 0.0
     
-    cfg.restart.enabled = False 
-    cfg.restart.file = None 
+    cfg.io.restart.enabled = False 
+    cfg.io.restart.file = None 
     
     while current_time < args.tend - 1e-9:
         next_time = min(current_time + args.dt_seg, args.tend)
@@ -46,9 +46,9 @@ def main():
         run_time_loop(cfg)
         
         current_time = next_time
-        cfg.restart.enabled = True 
+        cfg.io.restart.enabled = True 
         
-        cfg.restart.file = str(cfg.paths.data_dir / "f_final.npz")
+        cfg.io.restart.file = str(cfg.paths.data_dir / "f_final.npz")
         
     print(f"\n Segmented simulation finished successfully. Results saved in '{new_save_dir}' ")
     

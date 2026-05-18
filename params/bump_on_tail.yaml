@@ -31,3 +31,10 @@ optim:
   filter_t: ones
   lr: 10
   Nopt: 20
+io:
+  save_dir: null
+  compression_method: POD 
+  dt_save: 5.0
+  restart:
+    enabled: false
+    file: null
