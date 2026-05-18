@@ -1,4 +1,4 @@
-# Converted from matlab/params/PARAMS_landau_damping.m (grid + time only for this step).
+
 method: predcorr # or nufi (not implemented in Python yet)
 physics:
   charge: -1.0
