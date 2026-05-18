@@ -182,7 +182,7 @@ def plot_space_error(cfg):
     cfg.grid = make_periodic_grid(cfg.grid)
 
 
-def step(f: jnp.ndarray, cfg, t: float) -> tuple[jnp.ndarray, jnp.ndarray]:
+def step(f: jnp.ndarray, cfg, t: float, src=None) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Single time step"""
     method = cfg.method.lower()
 
@@ -201,8 +201,8 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
     cfg.grid = grid
     
     # f and t initialization 
-    if cfg.restart.enabled and cfg.restart.file:
-        restart_path = Path(cfg.restart.file) 
+    if cfg.io.restart.enabled and cfg.io.restart.file:
+        restart_path = Path(cfg.io.restart.file) 
         if not restart_path.exists():
             raise FileNotFoundError(f"Restart file '{restart_path}' not found.")
         

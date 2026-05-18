@@ -25,8 +25,8 @@ def test_segmented_vs_continuous(tmp_path: Path):
     cfg_seg.paths.data_dir.mkdir(parents=True, exist_ok=True)
     
     current_time = 0.0
-    cfg_seg.restart.enabled = False 
-    cfg_seg.restart.file = None 
+    cfg_seg.io.restart.enabled = False 
+    cfg_seg.io.restart.file = None 
     
     while current_time < tend - 1e-9:
         next_time = min(current_time + dt_seg, tend)
@@ -35,8 +35,8 @@ def test_segmented_vs_continuous(tmp_path: Path):
         run_time_loop(cfg_seg)
         
         current_time = next_time
-        cfg_seg.restart.enabled = True
-        cfg_seg.restart.file = str(cfg_seg.paths.data_dir / "f_final.npz")
+        cfg_seg.io.restart.enabled = True
+        cfg_seg.io.restart.file = str(cfg_seg.paths.data_dir / "f_final.npz")
         
     #compare diagnostics.csv files
     diag_cont = cfg_cont.paths.data_dir / "diagnostics.csv"

@@ -9,6 +9,7 @@ description = "Jax semi-Lagrangian plasma simulation"
 requires-python = ">=3.12"
 dependencies = [
     "matplotlib>=3.8.0",
+    "scienceplots>=2.1.0",
     "PyYAML>=6.0",
     # NVIDIA GPU wheels are published for Linux only (see JAX docs). Elsewhere: CPU jaxlib.
     "jax[cuda12]>=0.4.28; sys_platform == 'linux'",
