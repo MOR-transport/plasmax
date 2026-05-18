@@ -134,6 +134,6 @@ def load_config(path: str | Path) -> Config:
         method=str(data.get("method", "predcorr")),
         physics=Physics(**(data.get("physics") or {})),
         interp=Interp(**(data.get("interp") or data.get("opt_interp") or {})),
-        optim=Optim(**data["optim"])
+        optim=Optim(**data["optim"]),
         restart=restart,
     )

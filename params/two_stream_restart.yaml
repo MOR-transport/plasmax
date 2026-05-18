@@ -1,5 +1,4 @@
 method: predcorr
-# Output root; default results/<inicond.case>. Plots and diagnostics use save_dir/plots and save_dir/data.
 io:
   save_dir: null
 physics:
