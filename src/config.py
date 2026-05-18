@@ -32,6 +32,9 @@ class IniCond:
     alpha: float | None = None
     eps: float | None = None
     v0: float | None = None
+    vd: float | None = None
+    vt: float | None = None
+    nb: float | None = None
     #: For ``landau_damping``: ``"f0"`` or ``"f1"``; ``None`` matches MATLAB ``params.fini`` (``f1``).
     landau_profile: str | None = None
 
@@ -83,10 +86,27 @@ class Paths:
 
 
 @dataclass
+class Optim:
+    target: str
+    k: float | None = None
+    alpha: float | None = None
+    eps: float | None = None
+    v0: float | None = None
+    vd: float | None = None
+    vt: float | None = None
+    nb: float | None = None
+    filter_xv: str = "ones"
+    filter_t: str = "ones"
+    lr: float = 10
+    Nopt: int = 10
+
+
+@dataclass
 class Config:
     inicond: IniCond
     grid: Grid
     time: Time
+    optim: Optim
     paths: Paths
     method: str = "predcorr"
     physics: Physics = field(default_factory=Physics)
@@ -114,5 +134,6 @@ def load_config(path: str | Path) -> Config:
         method=str(data.get("method", "predcorr")),
         physics=Physics(**(data.get("physics") or {})),
         interp=Interp(**(data.get("interp") or data.get("opt_interp") or {})),
+        optim=Optim(**data["optim"])
         restart=restart,
     )
