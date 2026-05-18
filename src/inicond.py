@@ -55,16 +55,16 @@ class BumpOnTail(TestCase):
 
 
 def _create_experiment(ic) -> TestCase:
-    case = getattr(ic, "case", getattr(ic, "target", None))
+    expname = getattr(ic, "case", getattr(ic, "target", None))
     
-    if case == "landau_damping":
+    if expname == "landau_damping":
         return LandauDamping(ic.alpha, ic.k)
-    elif case == "two_stream":
+    elif expname == "two_stream":
         return TwoStream(ic.k, ic.eps, ic.v0)
-    elif case == "bump_on_tail":
+    elif expname == "bump_on_tail":
         return BumpOnTail(ic.k, ic.eps, ic.vd, ic.vt, ic.nb)
     else:
-        raise ValueError(f"Unknown case: {case!r}")
+        raise ValueError(f"Unknown case: {expname!r}")
 
 
 def get_inicond(cfg: Config):
