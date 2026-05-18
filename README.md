@@ -82,3 +82,8 @@ eg :
 ```bash
 plasmax-diags --params params/two_stream.yaml --format png
 ```
+
+## Testing
+
+To ensure the stability and accuracy of the simulations (such as the IO restart workflow), we use `pytest`.
+See the [tests/README.md](tests/README.md) for instructions on how to install the test dependencies and run the test suite.
