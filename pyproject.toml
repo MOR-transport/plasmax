@@ -20,10 +20,12 @@ dependencies = [
 [project.optional-dependencies]
 # Use on Linux if you have CUDA 13 + a new enough driver (see JAX installation docs).
 cuda13 = ["jax[cuda13]>=0.4.28"]
+test = ["pytest"]
 
 [project.scripts]
 plasma-sim = "src.sim:simulate"
 plasmax-diags = "src.diags:main"
+plasmax-segmented ="src.run_segmented:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]  

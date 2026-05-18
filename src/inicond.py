@@ -68,6 +68,21 @@ def _create_experiment(ic) -> TestCase:
 
 
 def get_inicond(cfg: Config):
+    ic = cfg.inicond
+
+    if ic.case.startswith("landau_damping"):
+        if ic.alpha is None or ic.k is None:
+            raise ValueError("landau_damping requires inicond.alpha and inicond.k")
+        alpha, k = ic.alpha, ic.k
+        return lambda x, v: landau_damping(x, v, alpha, k)
+        
+    if ic.case.startswith("two_stream"):
+        if ic.k is None or ic.eps is None or ic.v0 is None:
+            raise ValueError("two_stream requires inicond.k, inicond.eps, and inicond.v0")
+        k, eps, v0 = ic.k, ic.eps, ic.v0
+        return lambda x, v: two_stream(x, v, k, eps, v0)
+
+    raise ValueError(f"Unknown inicond.case: {ic.case!r}")
     experiment = _create_experiment(cfg.inicond)
     return experiment.get_initcond
 

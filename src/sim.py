@@ -16,6 +16,10 @@ from .diagnostics import measure
 
 jax.config.update("jax_enable_x64", True)
 
+# Default YAML next to project root `python/`, sibling of `src/` and `params/`.
+_DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "params" / "landau_damping.yaml"
+
+
 def plot_solution(cfg, f: jnp.ndarray,fname: str) -> None:
     cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
