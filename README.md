@@ -51,7 +51,7 @@ python main.py params/two_stream.yaml
 
 ## Diagnostics and plotting
 
-Runtime CSV diagnostics and the `plasmax-diags` post-processing tool are documented in [src/diagnostics/README.md](src/diagnostics/README.md).
+Runtime diagnostics can be visualized using `plasmax-diags` post-processing tool, which is documented in [src/diagnostics/README.md](src/diagnostics/README.md).
 
 ## Testing
 
