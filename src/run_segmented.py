@@ -7,11 +7,12 @@ def main():
     parser = argparse.ArgumentParser(description="Run PlasmaX simulation in segments.")
     parser.add_argument("--params", type=str, required=True, help="Base yaml config file")
     parser.add_argument("--tend", type=float, default=100.0, help="Total simulation time")
-    parser.add_argument("--dt-seg", type=float, default=5.0, help="Time duration of each segment")
     args = parser.parse_args()
     
     #base configuration
     cfg = load_config(args.params)  
+    
+    dt_seg = cfg.io.dt_save if cfg.io.dt_save is not None else 5.0
     
     #creating a segmented case to separate the results
     original_case = cfg.inicond.case 
@@ -34,7 +35,7 @@ def main():
     cfg.io.restart.file = None 
     
     while current_time < args.tend - 1e-9:
-        next_time = min(current_time + args.dt_seg, args.tend)
+        next_time = min(current_time + dt_seg, args.tend)
         
         print("\n" + "="*60)
         print(f"-> Running segment: t= {current_time:.2f} to t={next_time:.2f}")
