@@ -1,24 +1,20 @@
-import argparse
 import math
 import time as time_module
 from pathlib import Path
+import shutil
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 
-from .config import load_config
 from .inicond import get_inicond
 from .periodic_grid import make_periodic_grid
 from .predcorr import predictor_corrector_step
 from .physics import compute_density, vpoisson
+from .source import maxwell_distrib
+from .plotting import plot_solution, plot_Efield, plot_profile, plot_inicond, plot_energy
 from .diagnostics import measure
 
 jax.config.update("jax_enable_x64", True)
-
-# Default YAML next to project root `python/`, sibling of `src/` and `params/`.
-_DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "params" / "landau_damping.yaml"
-
 
 def plot_solution(cfg, f: jnp.ndarray,fname: str) -> None:
     cfg.grid = make_periodic_grid(cfg.grid)
@@ -185,7 +181,7 @@ def step(f: jnp.ndarray, cfg, t: float) -> tuple[jnp.ndarray, jnp.ndarray]:
     method = cfg.method.lower()
 
     if method == "predcorr":
-        return predictor_corrector_step(f, cfg.grid, cfg, t)
+        return predictor_corrector_step(f, cfg.grid, cfg, t, src)
     if method == "nufi":
         raise NotImplementedError(
             "NuFI time stepping is not implemented in Python; use method: predcorr in YAML."
@@ -193,7 +189,7 @@ def step(f: jnp.ndarray, cfg, t: float) -> tuple[jnp.ndarray, jnp.ndarray]:
     raise ValueError(f"Unknown cfg.method: {cfg.method!r} (expected predcorr or nufi).")
 
 
-def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
+def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     """Advance ``f`` until ``time >= cfg.time.tend`` or ``nt_max`` steps."""
     grid = make_periodic_grid(cfg.grid)
     cfg.grid = grid
@@ -225,6 +221,20 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
         
     rho = compute_density(f, grid.dv)
     Efield = vpoisson(rho, grid, cfg.physics.charge)
+    
+    if cfg.time.plot_freq > 0:
+        folder = Path("plots/simulation/sim_default")
+        folder_f = folder / "iterations/solution"
+        folder_E = folder / "iterations/Efield"
+
+        if folder.exists() and folder.is_dir():
+            shutil.rmtree(folder)
+
+        folder_f.mkdir(parents=True)
+        folder_E.mkdir(parents=True)
+
+        plot_inicond(cfg, f, folder_f / f"solution_{0:04d}.{format}")
+        plot_Efield(cfg, Efield, t, folder_E / f"Efield_{0:04d}.{format}")
 
     #number of iterations from the initial time
     remaining = max(0.0, cfg.time.tend - t)
@@ -234,7 +244,7 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
         return jnp.empty((0, grid.nv, grid.nx)), jnp.empty((0, grid.nx))        
     
     tcpu = []
-
+    
     if nb_profile > 0:
         fig, axs = plt.subplots(2, 1, figsize=(16, 10))
 
@@ -252,7 +262,7 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
 
         t0 = time_module.perf_counter()
         global_it = it + it_offset
-        f, Efield = step(f, cfg, t)
+        f, Efield = step(f, cfg, t, src)
         t += cfg.time.dt
         tcpu.append(time_module.perf_counter() - t0)
 
@@ -263,8 +273,8 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
 
         print(f"iter: {it}, time: {t:.6g}, dt: {cfg.time.dt:.6g}, "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
-            plot_solution(cfg, f, str(cfg.paths.plot_dir / f"solution_{it:04d}.png"))
-            plot_Efield(cfg, Efield, str(cfg.paths.plot_dir / f"Efield_{it:04d}.png"))
+            plot_solution(cfg, f, str(cfg.paths.plot_dir / f"solution_{it:04d}.{format}"))
+            plot_Efield(cfg, Efield, str(cfg.paths.plot_dir / f"Efield_{it:04d}.{format}"))
         if nb_profile > 0:
             if cfg.time.plot_freq > 0 and it % ((nt_cap-2) // nb_profile) == 0:
                 plot_profile(cfg, f, t, axs)
@@ -295,8 +305,7 @@ def run_time_loop(cfg, nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     return f_hist, Efield_hist
 
 
-def simulate() -> None:
-    
+def simulate(cfg) -> None:
     parser = argparse.ArgumentParser(description="Vlasov–Poisson driver (predcorr / NuFI stub).")
     parser.add_argument(
         "config",
@@ -314,7 +323,6 @@ def simulate() -> None:
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
 
-    run_time_loop(cfg)
-
-if __name__ == "__main__":
-    simulate()
+    f_hist, Efield_hist = run_time_loop(cfg, src=maxwell_distrib, format="png")
+    plot_profile(cfg, f_hist, format="png", nb_profiles=3)
+    plot_energy(cfg, Efield_hist)
