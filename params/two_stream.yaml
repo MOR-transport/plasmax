@@ -7,20 +7,26 @@ physics:
 interp:
   order: 3
 grid:
-  nx: 1024  # 2^10
-  nv: 1024
+  nx: 256  # 2^10
+  nv: 256
   lx: 31.41592653589793   # 2*pi/k with k = 0.2
-  lv: 15.707963267948966  # 5*pi
+  lv: 15.707963267948966  # 2*pi
 inicond:
   case: two_stream
-  alpha: null
+  eps: 0.05
+  v0: 3
+  k: 0.5
+time:
+  nt_max: 4000
+  dt: 1.5
+  tend: 15
+  plot_freq: 1
+optim:
+  target: two_stream
   eps: 0.05
   v0: 3
   k: 0.2
-time:
-  nt_max: 4000
-  dt: 0.2
-  tend: 40
-  plot_freq: 10
-io:
-  save_dir: null
+  filter_xv: ones
+  filter_t: ones
+  lr: 0.25
+  Nopt: 20

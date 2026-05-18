@@ -24,7 +24,7 @@ test = ["pytest"]
 
 [project.scripts]
 plasma-sim = "src.sim:simulate"
-plasmax-diags = "src.diags:main"
+plasmax-diags = "src.diagnostics.diags:main"
 plasmax-segmented ="src.run_segmented:main"
 
 [tool.hatch.build.targets.wheel]
