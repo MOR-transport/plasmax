@@ -135,18 +135,32 @@ def main():
     }
 
     cases_data = []
-    figure_dir: Path | None = None
+    
+    if args.output_dir:
+        figure_dir = Path(args.output_dir)
+    elif len(args.params) > 1:
+        figure_dir = Path("results/comparisons")
+    else:
+        figure_dir = None
+    
     for params_path_str in args.params:
         params_path = Path(params_path_str)
         if not params_path.exists():
             print(f"Warning: Params file '{params_path}' not found. Skipping.")
             continue
-
-        cfg = load_config(params_path)
-        case_name = cfg.inicond.case
-        csv_path = cfg.paths.data_dir / "diagnostics.csv"
-        figure_dir = Path(args.output_dir) if args.output_dir else cfg.paths.plot_dir
-
+        
+        if params_path.suffix == ".csv":
+            case_name = params_path.parent.parent.name 
+            csv_path = params_path
+            if figure_dir is None:
+                figure_dir = params_path.parent.parent / "plots"
+        else:
+            cfg = load_config(params_path)
+            case_name = cfg.inicond.case
+            csv_path = cfg.paths.data_dir / "diagnostics.csv"
+            if figure_dir is None:
+                figure_dir = cfg.paths.plot_dir
+                
         if not csv_path.exists():
             print(f"Warning: {csv_path} not found for {case_name}. Run simulation first.")
             continue
@@ -164,6 +178,7 @@ def main():
         return
 
     assert figure_dir is not None
+    figure_dir.mkdir(parents=True, exist_ok=True)
 
     for quantity in quantities:
         csv_key = name_mapping[quantity]
@@ -195,7 +210,7 @@ def main():
 
         title, ylabel = labels[quantity]
         ax.set_ylabel(ylabel, fontsize=12)
-        ax.set_title(title, fontsize=14)
+        ax.set_title(title, fontsize=12)
         ax.legend(loc="best")
         ax.grid(True, alpha=0.3)
 
@@ -204,8 +219,7 @@ def main():
         if len(cases_data) == 1:
             filename = f"{quantity}_{cases_data[0]['name']}"
         else:
-            case_names = "_".join([c["name"] for c in cases_data])
-            filename = f"{quantity}_{case_names}"
+            filename = f"{quantity}_comparaison"
 
         output_path = figure_dir / filename
         save_figure(fig, output_path, args.format)
