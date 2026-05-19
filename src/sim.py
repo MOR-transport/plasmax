@@ -125,15 +125,10 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
         print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.6g}, \
             "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
-<<<<<<< HEAD
-            plot_solution(cfg, f, t, str(cfg.paths.plot_dir / f"solution_{it:04d}.{format}"))
-            plot_Efield(cfg, Efield, t, str(cfg.paths.plot_dir / f"Efield_{it:04d}.{format}"))
-=======
             plot_solution(cfg, f, t,
                           str(cfg.paths.plot_dir / f"solution_{it:04d}.{format}"))
             plot_Efield(cfg, Efield, t,
                         str(cfg.paths.plot_dir / f"Efield_{it:04d}.{format}"))
->>>>>>> origin/main
         if nb_profile > 0:
             if cfg.time.plot_freq > 0 and it % ((nt_cap-2) // nb_profile) == 0:
                 plot_profile(cfg, f, t, axs)
@@ -166,12 +161,8 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
 
 def simulate(cfg=None) -> None:
     if cfg is None:
-<<<<<<< HEAD
-        parser = argparse.ArgumentParser(description="Vlasov–Poisson driver (predcorr / NuFI stub).")
-=======
         parser = argparse.ArgumentParser(
             description="Vlasov–Poisson driver (predcorr / NuFI stub).")
->>>>>>> origin/main
         parser.add_argument(
             "config",
             type=Path,
