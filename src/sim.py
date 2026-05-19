@@ -27,13 +27,17 @@ def step(f: jnp.ndarray, cfg, t: float, src=None) -> tuple[jnp.ndarray, jnp.ndar
     """Single time step"""
     method = cfg.method.lower()
 
-    if method == "predcorr":
-        return predictor_corrector_step(f, cfg.grid, cfg, t, src)
-    if method == "nufi":
-        raise NotImplementedError(
-            "NuFI time stepping is not implemented in Python; use method: predcorr in YAML."
-        )
-    raise ValueError(f"Unknown cfg.method: {cfg.method!r} (expected predcorr or nufi).")
+    match method.split():
+        case["predcorr"]:
+            return predictor_corrector_step(f, cfg.grid, cfg, t, src)
+        case["nufi"]:
+            raise NotImplementedError(
+                "NuFI time stepping is not implemented in Python; use method: "
+                "predcorr in YAML."
+            )
+        case _:
+            raise ValueError(f"Unknown cfg.method: {cfg.method!r} "
+                             "(expected predcorr or nufi).")
 
 
 def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
@@ -47,13 +51,13 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
         if not restart_path.exists():
             raise FileNotFoundError(f"Restart file '{restart_path}' not found.")
         
-        #loading .npz archive
+        # Loading .npz archive
         data = jnp.load(restart_path)
         f = data['f']
         t = float(data["t"])
         it_offset = int(data["it"])
         
-        #check the compatibility of the dimensions
+        # Check the compatibility of the dimensions
         if f.shape != (grid.nv, grid.nx):
             raise ValueError(f"Restart file shape {f.shape} != grid shape ({grid.nv}, {grid.nx})")
         
@@ -63,7 +67,7 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
         f0 = get_inicond(cfg)
         f = f0(grid.X, grid.V)
         t = 0.0
-        it_offset = 0 #no offset if we start at 0
+        it_offset = 0  # No offset if we start at 0
         print(f"Starting from analytical initial condition")
         
     rho = compute_density(f, grid.dv)
@@ -83,7 +87,7 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
         plot_inicond(cfg, f, folder_f / f"solution_{0:04d}.{format}")
         plot_Efield(cfg, Efield, t, folder_E / f"Efield_{0:04d}.{format}")
 
-    #number of iterations from the initial time
+    # Number of iterations from the initial time
     remaining = max(0.0, cfg.time.tend - t)
     nt_cap = min(cfg.time.nt_max, int(math.ceil(remaining / cfg.time.dt)))
     if nt_cap <=0: 
@@ -118,10 +122,18 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
         
         measure(cfg, f, Efield, global_it, t)
 
-        print(f"iter: {it}, time: {t:.6g}, dt: {cfg.time.dt:.6g}, "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
+        print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.6g}, \
+            "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
+<<<<<<< HEAD
             plot_solution(cfg, f, t, str(cfg.paths.plot_dir / f"solution_{it:04d}.{format}"))
             plot_Efield(cfg, Efield, t, str(cfg.paths.plot_dir / f"Efield_{it:04d}.{format}"))
+=======
+            plot_solution(cfg, f, t,
+                          str(cfg.paths.plot_dir / f"solution_{it:04d}.{format}"))
+            plot_Efield(cfg, Efield, t,
+                        str(cfg.paths.plot_dir / f"Efield_{it:04d}.{format}"))
+>>>>>>> origin/main
         if nb_profile > 0:
             if cfg.time.plot_freq > 0 and it % ((nt_cap-2) // nb_profile) == 0:
                 plot_profile(cfg, f, t, axs)
@@ -133,8 +145,8 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
     total = sum(tcpu)
     print(
         f"\n=== Simulation complete ===\n"
-        f"iterations: {len(tcpu)}, final time: {t:.6g}, total CPU: {total:.3f} s\n"
-        f"avg step: {total / max(len(tcpu), 1):.4f} s",
+        f"Nb of iterations: {len(tcpu)}, final time: {t:.6g}, total CPU: {total:.3f} s\n"
+        f"Average step time: {total / max(len(tcpu), 1):.4f} s",
         flush=True,
     )
 
@@ -143,7 +155,7 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
         axs[1].legend()
         fig.savefig(cfg.paths.plot_dir / "profile.png")
 
-    # save final distribution function and time to an .npz archive
+    # Save final distribution function and time to an .npz archive
     save_path = cfg.paths.data_dir / "f_final.npz"
     save_path.parent.mkdir(parents=True, exist_ok=True)
     jnp.savez(save_path, f=f, t=t, it=global_it)
@@ -154,7 +166,12 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
 
 def simulate(cfg=None) -> None:
     if cfg is None:
+<<<<<<< HEAD
         parser = argparse.ArgumentParser(description="Vlasov–Poisson driver (predcorr / NuFI stub).")
+=======
+        parser = argparse.ArgumentParser(
+            description="Vlasov–Poisson driver (predcorr / NuFI stub).")
+>>>>>>> origin/main
         parser.add_argument(
             "config",
             type=Path,
