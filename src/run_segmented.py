@@ -3,11 +3,41 @@ from pathlib import Path
 from .config import load_config, Paths 
 from .sim import run_time_loop 
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 
-def compress_pod(f: jnp.ndarray, rank: int) -> jnp.ndarray:
-    """Apply SVD and reconstruct the distribution f with rank r"""
+def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path, data_dir: Path) -> jnp.ndarray:
+    """Apply SVD, plot the spectrum, calculate the error and reconstruct the distribution f with rank r"""
     #SVD calculation
     U, s, VT = jnp.linalg.svd(f, full_matrices=False)
+    
+    #calculation of the error in Frobenius norm
+    total_energy = jnp.sum(s**2)
+    truncated_energy = jnp.sum(s[rank:]**2)
+    error_frob = float(jnp.sqrt(truncated_energy / total_energy))
+    #error saving
+    error_file = data_dir / "pod_frobenius_errors.csv"
+    if not error_file.exists():
+        with open(error_file, "w") as f_err:
+            f_err.write("time,frobenius_error\n")
+    
+    with open(error_file, "a") as f_err:
+        f_err.write(f"{current_time:.4f},{error_frob:.6e}\n")
+    
+    #plot of the normalized singular spectrum
+    s_norm = s / s[0]
+    
+    fig, ax = plt.subplots(figsize=(8, 6))    
+    ax.semilogy(s_norm, marker='o', linestyle='', color='#1f77b4', markersize=5, alpha=0.8, label=r"Normalized $\sigma_i$")    
+    ax.axvline(x=rank, color='#d62728', linestyle='--', linewidth=2, label=f'Truncation $r={rank}$')    
+    ax.set_xlabel(r'Singular Value Index $i$', fontsize=14, labelpad=10)
+    ax.set_ylabel(r'$\sigma_i / \sigma_1$', fontsize=14, labelpad=10)
+    ax.set_title(f'Normalized SVD Spectrum at $t={current_time:.2f}$', fontsize=16, pad=15)    
+    ax.grid(True, which='major', linestyle='-', alpha=0.5)
+    ax.grid(True, which='minor', linestyle=':', alpha=0.2)
+    ax.legend(loc='upper right', fontsize=12, frameon=True, edgecolor='black', fancybox=False, facecolor='white', framealpha=1.0)
+    fig.tight_layout()
+    fig.savefig(plot_dir / f"svd_spectrum_t{current_time:05.2f}.png", dpi=300, bbox_inches='tight')
+    plt.close(fig)
     
     #Truncation
     U_r = U[:, :rank]
@@ -16,6 +46,8 @@ def compress_pod(f: jnp.ndarray, rank: int) -> jnp.ndarray:
     
     #reconstruction
     f_comp = (U_r * s_r) @ VT_r
+    
+    print(f"-> Frobeniurs Error: {error_frob:.2e}")
     
     return f_comp   
 
@@ -78,7 +110,10 @@ def main():
             t_saved = data['t']
             it_saved = data['it']
             
-            f_comp = compress_pod(f_full, args.rank)
+            plot_dir = cfg.paths.save_dir.parent / segmented_case / "plots"
+            plot_dir.mkdir(parents=True, exist_ok=True)
+            
+            f_comp = compress_pod(f_full, args.rank, current_time, plot_dir, cfg.paths.data_dir)
             
             #overwrite the saved state with the compressed version
             jnp.savez(file_path, f=f_comp, t=t_saved, it=it_saved)

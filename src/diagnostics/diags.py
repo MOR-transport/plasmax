@@ -100,6 +100,7 @@ def main():
     parser.add_argument("--mass", action="store_true", help="Plot Mass")
     parser.add_argument("--momentum", action="store_true", help="Plot Momentum")
     parser.add_argument("--l2norm", action="store_true", help="Plot L2 Norm")
+    parser.add_argument("--frob", action="store_true", help="Plot Frobenius Error")
     parser.add_argument("--all", action="store_true", help="Generate all plots (default if no specific flags)")
 
     parser.add_argument("--format", choices=["png", "tex", "both"], default="both", help="Output format (default: both)")
@@ -223,6 +224,50 @@ def main():
 
         output_path = figure_dir / filename
         save_figure(fig, output_path, args.format)
+        plt.close(fig)
+    
+    #Frobenius error plot
+    if args.frob or args.all:
+        import numpy as np
+        fig, ax = plt.subplots(figsize=(8, 6))
+        plotted_frob = False
+        
+        for case in cases_data:
+            frob_path = case["csv_path"].parent / "pod_frobenius_errors.csv"
+            
+            if frob_path.exists():
+                try:
+                    frob_data = np.genfromtxt(frob_path, delimiter=',', skip_header=1)
+                    
+                    if frob_data.ndim == 1:
+                        frob_data = frob_data.reshape(1, -1)
+                        
+                    if frob_data.shape[1] >= 2:
+                        times_frob = frob_data[:, 0]
+                        errors_frob = frob_data[:, 1]
+                        
+                        #tracé en échelle logarithmique pour mieux visualiser les erreurs
+                        ax.semilogy(
+                            times_frob, errors_frob, 
+                            marker='o', linestyle='-', linewidth=2, markersize=6, alpha=0.8,
+                            label=case["name"]
+                        )
+                        plotted_frob = True
+                except Exception as e:
+                    print(f"Warning: Could not read {frob_path}: {e}")
+        
+        if plotted_frob:
+            ax.set_xlabel("Time", fontsize=14, labelpad=10)
+            ax.set_ylabel("Relative Frobenius Error", fontsize=14, labelpad=10)
+            ax.set_title("POD Truncation Error Over Time", fontsize=16, pad=15)
+            ax.legend(loc="best", fontsize=12, frameon=True, edgecolor='black')
+            
+            ax.grid(True, which='major', linestyle='-', alpha=0.5)
+            ax.grid(True, which='minor', linestyle=':', alpha=0.2)
+            fig.tight_layout()
+            
+            filename = "frob_error_comparison" if len(cases_data) > 1 else f"frob_error_{cases_data[0]['name']}"
+            save_figure(fig, figure_dir / filename, args.format)
         plt.close(fig)
 
     print(f"\nPlots saved to {figure_dir}.")
