@@ -64,8 +64,11 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
         print(f"Restarting from {restart_path} at t = {t:.6g}")
     
     else:
-        f0 = get_inicond(cfg)
-        f = f0(grid.X, grid.V)
+        if inicond is None:
+            f0 = get_inicond(cfg)
+            f = f0(grid.X, grid.V)
+        else:
+            f = inicond
         t = 0.0
         it_offset = 0  # No offset if we start at 0
         print(f"Starting from analytical initial condition")
