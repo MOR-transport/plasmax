@@ -167,14 +167,14 @@ def simulate(cfg=None) -> None:
         parser = argparse.ArgumentParser(
             description="Vlasov–Poisson driver (predcorr / NuFI stub).")
         parser.add_argument(
-            "config",
+            "--params",
             type=Path,
             nargs="?",
             default=_DEFAULT_CONFIG,
             help="Path to YAML (default: params/landau_damping.yaml next to src/)",
         )
         args = parser.parse_args()
-        cfg = load_config(args.config)
+        cfg = load_config(args.params)
 
     # Print device
     backend = jax.default_backend().lower()

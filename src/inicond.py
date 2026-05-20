@@ -70,7 +70,7 @@ def _create_experiment(ic) -> TestCase:
 def get_inicond(cfg: Config):
     case_name = cfg.inicond.case
     
-    #if the name contains "_segmented"
+    # If the name contains "_segmented"
     if case_name.endswith("_segmented"):
         exp_name_base = case_name.replace("_segmented", "")
         if exp_name_base == "landau_damping":
@@ -83,7 +83,7 @@ def get_inicond(cfg: Config):
             raise ValueError(f"Unknown base case for segmented run: {exp_name_base!r}")
         return experiment.get_initcond
     
-    #if it is the normal simulation case
+    # If it is the normal simulation case
     experiment = _create_experiment(cfg.inicond)
     return experiment.get_initcond
 
