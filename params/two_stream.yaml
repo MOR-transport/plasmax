@@ -15,7 +15,7 @@ inicond:
   case: two_stream
   eps: 0.05
   v0: 3
-  k: 0.5
+  k: 0.2
 time:
   nt_max: 4000
   dt: 1.5
