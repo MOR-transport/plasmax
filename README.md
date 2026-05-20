@@ -38,15 +38,15 @@ Editable install (`-e .`) registers the `plasma-sim` console script and keeps `p
 With the venv activated:
 
 ```bash
-plasma-sim                          # default: params/landau_damping.yaml
-plasma-sim params/two_stream.yaml  # explicit config
+plasmax-sim                                  # default: params/landau_damping.yaml
+plasmax-sim --params params/two_stream.yaml  # explicit config
 ```
 
 Or without installing the script:
 
 ```bash
 python main.py
-python main.py params/two_stream.yaml
+python main.py --params params/two_stream.yaml
 ```
 
 ## Diagnostics and plotting
