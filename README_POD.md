@@ -27,7 +27,7 @@ plasmax-segmented --params params/two_stream.yaml --tend 40 --rank 32
 You can easily plot the conserved quantities (Energy, Mass) and the truncation errors to observe the impact of different POD ranks:
 
 ```bash
-plasmax-diags --params results/two_stream/data/diagnostics.csv results/two_stream_segmented_POD_r32/data/diagnostics.csv results/two_stream_segmented_POD_r8/data/diagnostics.csv results/two_stream_segmented_POD_r2/data/diagnostics.csv --etot --mass --frob --format png
+plasmax-diags --params results/two_stream/data/diagnostics.csv results/two_stream_segmented_POD_r32/data/diagnostics.csv results/two_stream_segmented_POD_r8/data/diagnostics.csv results/two_stream_segmented_POD_r2/data/diagnostics.csv --etot --epot --mass --frob --format png
 ```
 
-**Note:** The comparison plots (`etot_comparison.png`,` mass_comparison.png`, and `frob_error_comparison.png`) will be automatically saved in a centralized directory at `results/comparisons/`
+**Note:** The comparison plots (`etot_comparison.png`, `etot_comparison.png`, `mass_comparison.png`, and `frob_error_comparison.png`) will be automatically saved in a centralized directory at `results/comparisons/`
