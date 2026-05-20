@@ -20,7 +20,7 @@ def main():
         help="La partie du programme à exécuter"
     )
     parser.add_argument(
-        "config",
+        "--params",
         type=Path,
         nargs="?",
         default=_DEFAULT_CONFIG,
@@ -28,7 +28,7 @@ def main():
     )
     args = parser.parse_args()
 
-    cfg = load_config(args.config)
+    cfg = load_config(args.params)
 
     if args.task == "sim":
         simulate(cfg)

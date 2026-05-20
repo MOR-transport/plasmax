@@ -55,34 +55,35 @@ class BumpOnTail(TestCase):
 
 
 def _create_experiment(ic) -> TestCase:
-    case = getattr(ic, "case", getattr(ic, "target", None))
+    expname = getattr(ic, "case", getattr(ic, "target", None))
     
-    if case == "landau_damping":
+    if expname == "landau_damping":
         return LandauDamping(ic.alpha, ic.k)
-    elif case == "two_stream":
+    elif expname == "two_stream":
         return TwoStream(ic.k, ic.eps, ic.v0)
-    elif case == "bump_on_tail":
+    elif expname == "bump_on_tail":
         return BumpOnTail(ic.k, ic.eps, ic.vd, ic.vt, ic.nb)
     else:
-        raise ValueError(f"Unknown case: {case!r}")
+        raise ValueError(f"Unknown case: {expname!r}")
 
 
 def get_inicond(cfg: Config):
-    ic = cfg.inicond
-
-    if ic.case.startswith("landau_damping"):
-        if ic.alpha is None or ic.k is None:
-            raise ValueError("landau_damping requires inicond.alpha and inicond.k")
-        alpha, k = ic.alpha, ic.k
-        return lambda x, v: landau_damping(x, v, alpha, k)
-        
-    if ic.case.startswith("two_stream"):
-        if ic.k is None or ic.eps is None or ic.v0 is None:
-            raise ValueError("two_stream requires inicond.k, inicond.eps, and inicond.v0")
-        k, eps, v0 = ic.k, ic.eps, ic.v0
-        return lambda x, v: two_stream(x, v, k, eps, v0)
-
-    raise ValueError(f"Unknown inicond.case: {ic.case!r}")
+    case_name = cfg.inicond.case
+    
+    # If the name contains "_segmented"
+    if case_name.endswith("_segmented"):
+        exp_name_base = case_name.replace("_segmented", "")
+        if exp_name_base == "landau_damping":
+            experiment = LandauDamping(cfg.inicond.alpha, cfg.inicond.k)
+        elif exp_name_base == "two_stream":
+            experiment = TwoStream(cfg.inicond.k, cfg.inicond.eps, cfg.inicond.v0)
+        elif exp_name_base == "bump_on_tail":
+            experiment = BumpOnTail(cfg.inicond.k, cfg.inicond.eps, cfg.inicond.vd, cfg.inicond.vt, cfg.inicond.nb)
+        else:
+            raise ValueError(f"Unknown base case for segmented run: {exp_name_base!r}")
+        return experiment.get_initcond
+    
+    # If it is the normal simulation case
     experiment = _create_experiment(cfg.inicond)
     return experiment.get_initcond
 

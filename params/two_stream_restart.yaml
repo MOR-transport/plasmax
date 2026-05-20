@@ -1,6 +1,4 @@
 method: predcorr
-io:
-  save_dir: null
 physics:
   charge: -1.0
   mass: 1.0
@@ -23,6 +21,10 @@ time:
   dt: 0.2
   tend: 80
   plot_freq: 0
-restart:
-  enabled: true
-  file: results/two_stream/data/f_final.npz
+io:
+  save_dir: null
+  compression_method: POD
+  dt_save: 5.0
+  restart:
+    enabled: true
+    file: results/two_stream/data/f_final.npz

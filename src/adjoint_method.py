@@ -1,4 +1,5 @@
 import math
+import argparse
 from pathlib import Path
 import shutil
 import time as time_module
@@ -6,6 +7,7 @@ import time as time_module
 import jax
 import jax.numpy as jnp
 
+from .config import load_config
 from .inicond import get_inicond, get_inicond_exp
 from .sim import run_time_loop
 from .advect import advect_with_source_hist
@@ -75,6 +77,7 @@ def line_search(cfg, inicond, f, fexp, adj, big_alpha, m=1e-4, theta=0.5):
         return line_search_step(cfg, alpha, inicond, adj)
     
     J = lambda f: functionnal(cfg, f, fexp)
+    
     while True:
         print(f"\nTRY ALPHA = {alpha}")
 
@@ -106,6 +109,7 @@ def adjoint(cfg, line_search_opt=True, tolerance=0.0001, format="png"):
     folder_it = folder / "iterations"
 
     if folder.exists() and folder.is_dir():
+        print("WARNING: Erasing existing plots/optimization/default_optim/ folder!")
         shutil.rmtree(folder)
 
     folder_it.mkdir(parents=True)
@@ -144,3 +148,12 @@ def optimize(cfg):
     print(f"Device: {device}", flush=True)
 
     adjoint(cfg, line_search_opt=True, format="png")
+
+    
+def main():
+    parser = argparse.ArgumentParser(description="Vlasov–Poisson driver (predcorr / NuFI stub).")
+    parser.add_argument("--params", type=str, required=True, help="Base yaml config file")
+    args = parser.parse_args()
+    
+    cfg = load_config(args.params)
+    optimize(cfg)

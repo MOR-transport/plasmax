@@ -54,8 +54,7 @@ def ones(cfg):
 
 
 def compute_src(cfg, f_hist, fexp):
-    sigxv = ones(cfg)
-    sigt = ones(cfg)
+    sigxv, sigt = get_filters_exp(cfg)
     return (f_hist - fexp) * sigxv * sigt
 
 

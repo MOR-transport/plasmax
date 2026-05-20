@@ -14,7 +14,7 @@ inicond:
   case: two_stream
   eps: 0.05
   v0: 3
-  k: 0.5
+  k: 0.2
 time:
   nt_max: 4000
   dt: 1.5
@@ -29,3 +29,10 @@ optim:
   filter_t: ones
   lr: 0.25
   Nopt: 20
+io:
+  save_dir: null
+  compression_method: POD 
+  dt_save: 5.0
+  restart:
+    enabled: false
+    file: null
