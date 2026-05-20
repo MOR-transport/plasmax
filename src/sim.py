@@ -109,7 +109,8 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
     Efield_hist = Efield_hist.at[0, :].set(Efield)
     
     global_it = it_offset 
-
+    if global_it == 0:
+        measure(cfg, f, Efield, global_it, t)
     for it in range(1, nt_cap + 1):
 
         t0 = time_module.perf_counter()
@@ -123,8 +124,7 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
         
         measure(cfg, f, Efield, global_it, t)
 
-        print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.6g}, \
-            "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
+        print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.2f}, cpu_time: {tcpu[-1]:.2f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
             plot_solution(cfg, f, t,
                           str(cfg.paths.plot_dir / f"solution_{it:04d}.{format}"))
@@ -178,7 +178,9 @@ def simulate(cfg=None) -> None:
     backend = jax.default_backend().lower()
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
-
-    f_hist, Efield_hist = run_time_loop(cfg, src=maxwell_distrib, format="png")
+    if cfg.physics.knudsen is not None:
+        f_hist, Efield_hist = run_time_loop(cfg, src=maxwell_distrib, format="png")
+    else:
+        f_hist, Efield_hist = run_time_loop(cfg, format="png")
     plot_profile(cfg, f_hist, format="png", nb_profiles=3)
     plot_energy(cfg, Efield_hist)

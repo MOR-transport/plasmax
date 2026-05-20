@@ -175,7 +175,7 @@ def main():
                 print(f"Warning: {csv_key} not found in {case['name']}")
                 continue
 
-            ax.plot(
+            ax.semilogy(
                 case["times"],
                 case["data"][csv_key],
                 label=case["name"],

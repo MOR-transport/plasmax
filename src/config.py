@@ -63,7 +63,8 @@ class Physics:
     """Single-species Vlasov–Poisson constants"""
     charge: float = -1.0
     mass: float = 1.0
-    knudsen: float = 1
+    knudsen: float = None
+    source = None
 
 
 @dataclass
