@@ -11,7 +11,6 @@ if not hasattr(backend_pgf, "common_texification") and hasattr(backend_pgf, "_te
     backend_pgf.common_texification = backend_pgf._tex_escape
 from tikzplotlib import save
 
-from .periodic_grid import make_periodic_grid
 from .config import Config
 
 
@@ -26,7 +25,6 @@ plt.rcParams.update({
 
 
 def plot_solution(cfg, f: jnp.ndarray, t: float, fname: str) -> None:
-    cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
     pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, f, shading="auto", cmap='turbo')
     fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
@@ -45,7 +43,6 @@ def plot_solution(cfg, f: jnp.ndarray, t: float, fname: str) -> None:
 
 
 def plot_Efield(cfg, Efield: jnp.ndarray, t, fname: str) -> None:
-    cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(cfg.grid.x, Efield)
     ax.set_xlabel(r"$x$")
@@ -62,8 +59,6 @@ def plot_Efield(cfg, Efield: jnp.ndarray, t, fname: str) -> None:
 
 
 def plot_profile(cfg, f_hist: jnp.ndarray, format="png", nb_profiles=3) -> None:
-    cfg.grid = make_periodic_grid(cfg.grid)
-    
     fig, axs = plt.subplots(1, 2, figsize=(25, 10))
     
     axs[0].set_xlabel(r"$v$")
@@ -95,8 +90,6 @@ def plot_profile(cfg, f_hist: jnp.ndarray, format="png", nb_profiles=3) -> None:
 
 
 def plot_energy(cfg, Efield_hist, format="png"):
-    cfg.grid = make_periodic_grid(cfg.grid)
-
     energy = (1/2) * jnp.sum(Efield_hist ** 2, axis=1) * cfg.grid.dx
 
     Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
@@ -160,7 +153,6 @@ def make_anim_2d(cfg, hist, fname):
 
 
 def plot_source(cfg: Config, source, f: jnp.ndarray, fname):
-    cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
     pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, source(cfg, f), shading="auto", cmap='turbo')
     fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
@@ -178,7 +170,6 @@ def plot_source(cfg: Config, source, f: jnp.ndarray, fname):
 
 
 def plot_inicond(cfg, inicond: jnp.ndarray, fname: str) -> None:
-    cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
     pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, inicond, shading="auto", cmap='turbo')
     fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
@@ -197,8 +188,6 @@ def plot_inicond(cfg, inicond: jnp.ndarray, fname: str) -> None:
 
 
 def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
-    cfg.grid = make_periodic_grid(cfg.grid)
-
     fig, axs = plt.subplots(2, 3, figsize=(35, 18))
 
     iterations = jnp.arange(1, len(residual)+1)

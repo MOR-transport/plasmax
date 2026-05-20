@@ -9,7 +9,6 @@ import jax
 import jax.numpy as jnp
 
 from .inicond import get_inicond
-from .periodic_grid import make_periodic_grid
 from .predcorr import predictor_corrector_step
 from .physics import compute_density, vpoisson
 from .source import maxwell_distrib
@@ -42,9 +41,8 @@ def step(f: jnp.ndarray, cfg, t: float, src=None) -> tuple[jnp.ndarray, jnp.ndar
 
 def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     """Advance ``f`` until ``time >= cfg.time.tend`` or ``nt_max`` steps."""
-    grid = make_periodic_grid(cfg.grid)
-    cfg.grid = grid
-    
+    grid = cfg.grid
+
     # f and t initialization 
     if cfg.io.restart.enabled and cfg.io.restart.file:
         restart_path = Path(cfg.io.restart.file) 
