@@ -17,7 +17,7 @@ Make sure your `.yaml` file contains `compression_method: POD` in the `io:` bloc
 
 ```bash
 #example with truncation rank=32
-plasmax-segmented --params params/two_stream.yaml --tend 40 --rank 32
+plasmax-segmented --params params/two_stream.yaml --rank 32
 ```
 
 **Note:** The script automatically creates an isolated directory `( results/two_stream_segmented_POD_r32)` to avoid overwriting baseline data.

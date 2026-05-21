@@ -54,12 +54,14 @@ def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path,
 def main():
     parser = argparse.ArgumentParser(description="Run PlasmaX simulation in segments.")
     parser.add_argument("--params", type=str, required=True, help="Base yaml config file")
-    parser.add_argument("--tend", type=float, default=100.0, help="Total simulation time")
+    parser.add_argument("--tend", type=float, default=None, help="Total simulation time")
     parser.add_argument("--rank", type=int, default=32, help="Rank for POD compression")
     args = parser.parse_args()
     
     #base configuration
     cfg = load_config(args.params)  
+    
+    final_time = args.tend if args.tend is not None else cfg.time.tend
     
     dt_seg = cfg.io.dt_save if cfg.io.dt_save is not None else 5.0
     
@@ -86,8 +88,8 @@ def main():
     cfg.io.restart.enabled = False 
     cfg.io.restart.file = None 
     
-    while current_time < args.tend - 1e-9:
-        next_time = min(current_time + dt_seg, args.tend)
+    while current_time < final_time - 1e-9:
+        next_time = min(current_time + dt_seg, final_time)
         
         print("\n" + "="*60)
         print(f"-> Running segment: t= {current_time:.2f} to t={next_time:.2f}")
