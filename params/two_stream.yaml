@@ -18,7 +18,7 @@ inicond:
 time:
   nt_max: 4000
   dt: 1.5
-  tend: 15
+  tend: 40
   plot_freq: 1
 optim:
   target: two_stream

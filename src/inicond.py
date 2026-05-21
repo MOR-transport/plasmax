@@ -69,10 +69,10 @@ def _create_experiment(ic) -> TestCase:
 
 def get_inicond(cfg: Config):
     case_name = cfg.inicond.case
-    
-    # If the name contains "_segmented"
-    if case_name.endswith("_segmented"):
-        exp_name_base = case_name.replace("_segmented", "")
+
+    if "_segmented" in case_name:
+        exp_name_base = case_name.split("_segmented")[0] 
+        
         if exp_name_base == "landau_damping":
             experiment = LandauDamping(cfg.inicond.alpha, cfg.inicond.k)
         elif exp_name_base == "two_stream":
@@ -81,9 +81,8 @@ def get_inicond(cfg: Config):
             experiment = BumpOnTail(cfg.inicond.k, cfg.inicond.eps, cfg.inicond.vd, cfg.inicond.vt, cfg.inicond.nb)
         else:
             raise ValueError(f"Unknown base case for segmented run: {exp_name_base!r}")
-        return experiment.get_initcond
+        return experiment.get_initcond 
     
-    # If it is the normal simulation case
     experiment = _create_experiment(cfg.inicond)
     return experiment.get_initcond
 
