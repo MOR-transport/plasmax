@@ -37,10 +37,10 @@ def measure(cfg: Config, f: jnp.ndarray, Efield: jnp.ndarray, it: int, t_actual:
         "momentum": float(momentum),
     }
 
-    file_exists = diag_file_path.is_file()
-    with open(diag_file_path, mode="a", newline="") as file:
+    reset = it == 0
+    with open(diag_file_path, mode="w" if reset else "a", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=data.keys())
-        if not file_exists:
+        if reset or not diag_file_path.is_file():
             writer.writeheader()
         writer.writerow(data)
 

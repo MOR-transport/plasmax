@@ -3,14 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
+import jax.numpy as jnp
 import yaml
 
 
 @dataclass
 class Grid:
-    """Spatial / velocity resolution and domain (arrays filled by ``make_periodic_grid``)."""
-
     nx: int
     nv: int
     lx: float
@@ -23,6 +21,19 @@ class Grid:
     V: Any = None
     kx: Any = None
     kx2_inverse: Any = None
+
+    def __post_init__(self) -> None:
+        x = jnp.linspace(0, self.lx, self.nx, endpoint=False)
+        v = jnp.linspace(-self.lv, self.lv, self.nv, endpoint=False)
+        self.dx = float(x[1] - x[0])
+        self.dv = float(v[1] - v[0])
+        self.x = x
+        self.v = v
+        self.X, self.V = jnp.meshgrid(self.x, self.v, indexing="xy")
+        self.kx = 2 * jnp.pi * jnp.fft.fftfreq(self.nx, d=self.dx)
+        self.kx2 = self.kx * self.kx
+        self.kx2_inverse = self.kx2.at[0].set(1.0)
+        self.kx2_inverse = 1 / self.kx2_inverse
 
 
 @dataclass
@@ -52,7 +63,8 @@ class Physics:
     """Single-species Vlasov–Poisson constants"""
     charge: float = -1.0
     mass: float = 1.0
-    knudsen: float = 1
+    knudsen: float = None
+    source = None
 
 
 @dataclass
@@ -141,15 +153,10 @@ def load_config(path: str | Path) -> Config:
     
     optim_data = data.get("optim", {})
     optim = Optim(**optim_data) if optim_data else Optim(target=inicond.case)
-
-    return Config(
-        inicond=inicond,
-        grid=Grid(**data["grid"]),
-        time=Time(**data["time"]),
-        paths=paths,
-        io=io_cfg,
-        optim=optim,
-        method=str(data.get("method", "predcorr")),
-        physics=Physics(**(data.get("physics") or {})),
-        interp=Interp(**(data.get("interp") or data.get("opt_interp") or {})),
-    )
+    cfg = Config( inicond=inicond, grid=Grid(**data["grid"]), time=Time(**data["time"]),
+                paths=paths, io=io_cfg, optim=optim,method=str(data.get("method", "predcorr")),
+                physics=Physics(**(data.get("physics") or {})), interp=Interp(**(data.get("interp") or data.get("opt_interp") or {})))
+    # test if inicondition fits periodically in domain
+    if cfg.inicond.k is not None:
+        assert jnp.abs(cfg.grid.lx - 2*jnp.pi/cfg.inicond.k) < 1e-12, f"grid.lx = {cfg.grid.lx} != 2*pi/k = {2*jnp.pi/cfg.inicond.k}"
+    return cfg

@@ -11,7 +11,6 @@ if not hasattr(backend_pgf, "common_texification") and hasattr(backend_pgf, "_te
     backend_pgf.common_texification = backend_pgf._tex_escape
 from tikzplotlib import save
 
-from .periodic_grid import make_periodic_grid
 from .config import Config
 
 
@@ -26,13 +25,12 @@ plt.rcParams.update({
 
 
 def plot_solution(cfg, f: jnp.ndarray, t: float, fname: str) -> None:
-    cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
     pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, f, shading="auto", cmap='turbo')
     fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
     ax.set_xlabel(r"$x$")
     ax.set_ylabel(r"$v$")
-    ax.set_title(f"Solution at t = {t:.2f}  ({cfg.inicond.case}) (Kn = {cfg.physics.knudsen:.0e})")
+    ax.set_title(f"Solution at t = {t:.2f}")
     fig.tight_layout()
     if fname is not None:
         if str(fname)[-3:] == "png":
@@ -45,11 +43,10 @@ def plot_solution(cfg, f: jnp.ndarray, t: float, fname: str) -> None:
 
 
 def plot_Efield(cfg, Efield: jnp.ndarray, t, fname: str) -> None:
-    cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(cfg.grid.x, Efield)
     ax.set_xlabel(r"$x$")
-    ax.set_title(f"Electric field at t = {t:.2f} ({cfg.inicond.case}) (Kn = {cfg.physics.knudsen:.0e})")
+    ax.set_title(f"Electric field at t = {t:.2f}")
     fig.tight_layout()
     if fname is not None:
         if str(fname)[-3:] == "png":
@@ -62,17 +59,15 @@ def plot_Efield(cfg, Efield: jnp.ndarray, t, fname: str) -> None:
 
 
 def plot_profile(cfg, f_hist: jnp.ndarray, format="png", nb_profiles=3) -> None:
-    cfg.grid = make_periodic_grid(cfg.grid)
-    
     fig, axs = plt.subplots(1, 2, figsize=(25, 10))
     
     axs[0].set_xlabel(r"$v$")
     axs[0].set_ylabel(r"$f(x=" + str(cfg.grid.dx * cfg.grid.nx//2) + ", v, t= .)$")
-    axs[0].set_title(f"Profile in v ({cfg.inicond.case}) (Kn = {cfg.physics.knudsen:.0e})")
+    axs[0].set_title(f"Profile in v")
     
     axs[1].set_xlabel(r"$x$")
     axs[1].set_ylabel(r"$f(x, v=" + str(cfg.grid.dv * cfg.grid.nv//2) + ", t= .)$")
-    axs[1].set_title(f"Profile in x ({cfg.inicond.case}) (Kn = {cfg.physics.knudsen:.0e})")
+    axs[1].set_title(f"Profile in x")
 
     nt = f_hist.shape[0]
     for it in range(1, nb_profiles+1):
@@ -95,8 +90,6 @@ def plot_profile(cfg, f_hist: jnp.ndarray, format="png", nb_profiles=3) -> None:
 
 
 def plot_energy(cfg, Efield_hist, format="png"):
-    cfg.grid = make_periodic_grid(cfg.grid)
-
     energy = (1/2) * jnp.sum(Efield_hist ** 2, axis=1) * cfg.grid.dx
 
     Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
@@ -105,9 +98,9 @@ def plot_energy(cfg, Efield_hist, format="png"):
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.semilogy(t, energy)
 
-    ax.set_xlabel(r"$t$")
-    ax.set_ylabel(r"$\log E_{pe}$")
-    ax.set_title(f"Potential electrostatic energy (Kn = {cfg.physics.knudsen:.0e})")
+    ax.set_xlabel(r"time $t$")
+    ax.set_ylabel(r"$E_\text{pot}$")
+    ax.set_title(f"Potential energy")
 
     folder = Path(f"plots/simulation/sim_default")
     if format == "png":
@@ -160,7 +153,6 @@ def make_anim_2d(cfg, hist, fname):
 
 
 def plot_source(cfg: Config, source, f: jnp.ndarray, fname):
-    cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
     pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, source(cfg, f), shading="auto", cmap='turbo')
     fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
@@ -178,7 +170,6 @@ def plot_source(cfg: Config, source, f: jnp.ndarray, fname):
 
 
 def plot_inicond(cfg, inicond: jnp.ndarray, fname: str) -> None:
-    cfg.grid = make_periodic_grid(cfg.grid)
     fig, ax = plt.subplots(figsize=(8, 5))
     pcm = ax.pcolormesh(cfg.grid.X, cfg.grid.V, inicond, shading="auto", cmap='turbo')
     fig.colorbar(pcm, ax=ax, label=r"$f(x,v)$")
@@ -197,8 +188,6 @@ def plot_inicond(cfg, inicond: jnp.ndarray, fname: str) -> None:
 
 
 def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
-    cfg.grid = make_periodic_grid(cfg.grid)
-
     fig, axs = plt.subplots(2, 3, figsize=(35, 18))
 
     iterations = jnp.arange(1, len(residual)+1)

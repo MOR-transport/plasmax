@@ -3,9 +3,13 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+import matplotlib.backends.backend_pgf as backend_pgf
+
+if not hasattr(backend_pgf, "common_texification") and hasattr(backend_pgf, "_tex_escape"):
+    backend_pgf.common_texification = backend_pgf._tex_escape
 from tikzplotlib import save
 
-from .periodic_grid import make_periodic_grid
+from .config import Grid
 from .sim import run_time_loop
 from .source import maxwell_distrib
 
@@ -82,6 +86,9 @@ def plot_space_error(cfg, src=None, format="png"):
         raise ValueError("Invalid space step: dx and dv must be equal")
     
     nxv_backup = cfg.grid.nx
+    lx_backup = cfg.grid.lx
+    lv_backup = cfg.grid.lv
+    k_backup = cfg.grid.k
     nxv_ref = jnp.float32(jnp.log2(cfg.grid.nx))
     if nxv_ref - jnp.floor(nxv_ref) != 0:
         raise ValueError("Invalid space step: dx and dx must be a power of 2")
@@ -99,9 +106,7 @@ def plot_space_error(cfg, src=None, format="png"):
     powers_nxvs = jnp.arange(nxv_ref-1, 3, -1)
     for power in powers_nxvs:
         step = 2 ** power
-        cfg.grid.nx = step
-        cfg.grid.nv = step
-        cfg.grid = make_periodic_grid(cfg.grid)
+        cfg.grid = Grid(step, step, lx_backup, lv_backup, k=k_backup)
 
         f, _ = run_time_loop(cfg, src=src)
         f = f[-1, :, :]
@@ -147,9 +152,7 @@ def plot_space_error(cfg, src=None, format="png"):
         save(folder / f"space_error-Kn_{cfg.physics.knudsen:.0e}.tex", encoding="utf-8")
     plt.close(fig)
 
-    cfg.grid.nx = nxv_backup
-    cfg.grid.nv = nxv_backup
-    cfg.grid = make_periodic_grid(cfg.grid)
+    cfg.grid = Grid(nxv_backup, nxv_backup, lx_backup, lv_backup, k=k_backup)
 
 
 def plot_errors(cfg):
@@ -157,9 +160,6 @@ def plot_errors(cfg):
     backend = jax.default_backend().lower()
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
-
-    grid = make_periodic_grid(cfg.grid)
-    cfg.grid = grid
 
     plot_time_error(cfg, format="png")
     plot_space_error(cfg, format="png")

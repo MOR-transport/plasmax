@@ -12,7 +12,6 @@ from .inicond import get_inicond, get_inicond_exp
 from .sim import run_time_loop
 from .advect import advect_with_source_hist
 from .plotting import make_anim_2d, plot_optimisation
-from .periodic_grid import make_periodic_grid
 from .source import get_filters_exp, compute_src
 
 jax.config.update("jax_enable_x64", True)
@@ -24,9 +23,8 @@ def functionnal(cfg, f_hist, fexp):
     return jnp.sum(integrant) * cfg.time.dt * cfg.grid.dx * cfg.grid.dv
 
 
-def run_time_loop_adjoint(cfg, Efield, src, verbose=True):
-    grid = make_periodic_grid(cfg.grid)
-    cfg.grid = grid
+def run_time_loop_adjoint(cfg, Efield, src):
+    grid = cfg.grid
 
     f = jnp.zeros((grid.nv, grid.nx), dtype=jnp.float64)
     t = cfg.time.tend
@@ -97,7 +95,6 @@ def line_search(cfg, inicond, f, fexp, adj, alpha_init, m=1e-4, theta=0.5):
 
 
 def adjoint(cfg, line_search_opt=True, tolerance=0.0001, format="png"):
-    cfg.grid = make_periodic_grid(cfg.grid)
     cfg.time.plot_freq = 0
 
     inicond_exp = get_inicond_exp(cfg)(cfg.grid.X, cfg.grid.V)
