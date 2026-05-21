@@ -1,0 +1,23 @@
+# Minimal two-stream setup for regression test (10 time steps).
+method: predcorr
+physics:
+  charge: -1.0
+  mass: 1.0
+interp:
+  order: 3
+grid:
+  nx: 64
+  nv: 64
+  lx: 31.41592653589793
+  lv: 15.707963267948966
+inicond:
+  case: two_stream
+  eps: 0.05
+  v0: 3
+  k: 0.2
+time:
+  nt_max: 10
+  dt: 0.1
+  tend: 1.0
+  plot_freq: 0
+

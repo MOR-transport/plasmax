@@ -1,0 +1,9 @@
+# Last row of diagnostics.csv after 10 steps (tests/two_stream_test.yaml, 64x64 grid).
+iter: 10
+time: 1.0
+ekin: 157.4887692901245
+epot: 0.10307681099108712
+etot: 157.5918461011156
+l2norm: 2.104715645116879
+mass: 31.415926535896748
+momentum: -1.670756147112952e-11

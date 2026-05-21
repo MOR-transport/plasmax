@@ -24,7 +24,8 @@ cuda13 = ["jax[cuda13]>=0.4.28"]
 test = ["pytest"]
 
 [project.scripts]
-plasma-sim = "src.sim:simulate"
+plasmax-sim = "src.sim:simulate"
+plasmax-optim = "src.adjoint_method:main"
 plasmax-diags = "src.diagnostics.diags:main"
 plasmax-segmented ="src.run_segmented:main"
 

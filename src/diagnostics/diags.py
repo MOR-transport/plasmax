@@ -190,21 +190,13 @@ def main():
             if csv_key not in case["data"]:
                 print(f"Warning: {csv_key} not found in {case['name']}")
                 continue
-            
-            if quantity == "epot":
-                ax.semilogy(
-                    case["times"],
-                    case["data"][csv_key],
-                    label=case["name"],
-                    linewidth=2,
-                )
-            else:
-                ax.plot(
-                    case["times"],
-                    case["data"][csv_key],
-                    label=case["name"],
-                    linewidth=2,
-                )
+
+            ax.semilogy(
+                case["times"],
+                case["data"][csv_key],
+                label=case["name"],
+                linewidth=2,
+            )
 
         ax.set_xlabel("Time", fontsize=12)
 
