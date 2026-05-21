@@ -23,7 +23,7 @@ def functionnal(cfg, f_hist, fexp):
     return jnp.sum(integrant) * cfg.time.dt * cfg.grid.dx * cfg.grid.dv
 
 
-def run_time_loop_adjoint(cfg, Efield, src):
+def run_time_loop_adjoint(cfg, Efield, src, verbose=False):
     grid = cfg.grid
 
     f = jnp.zeros((grid.nv, grid.nx), dtype=jnp.float64)

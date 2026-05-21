@@ -126,7 +126,9 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
         
         measure(cfg, f, Efield, global_it, t)
 
-        print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.2f}, cpu_time: {tcpu[-1]:.2f} s", flush=True)
+        if verbose:
+            print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.2f}, "
+                  f"cpu_time: {tcpu[-1]:.2f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
             plot_solution(cfg, f, t,
                           str(cfg.paths.plot_dir / f"solution_{it:04d}.{format}"))
