@@ -94,7 +94,7 @@ def line_search(cfg, inicond, f, fexp, adj, alpha_init, m=1e-4, theta=0.5):
             return line_search_step(cfg, alpha, inicond, adj)
 
 
-def adjoint(cfg, line_search_opt=True, tolerance=0.0001, format="png"):
+def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
     cfg.time.plot_freq = 0
 
     inicond_exp = get_inicond_exp(cfg)(cfg.grid.X, cfg.grid.V)
@@ -125,14 +125,20 @@ def adjoint(cfg, line_search_opt=True, tolerance=0.0001, format="png"):
     for it in range(1, cfg.optim.Nopt+1):
         print(f"##### Iteration {it:3d} #####")
         residuals.append(functionnal(cfg, f_hist, f_exp))
+        # Halting condition : progress in the objective function
+        if it>1 and residuals[-2]-residuals[-1] < tolerance*residuals[-2]:
+            cfg.optim.Nopt = it
+            print("Insufficient progression")
+            break
         
         src = compute_src(cfg, f_hist, f_exp)
         adj_hist = run_time_loop_adjoint(cfg, Efield_hist, src, verbose=False)
 
         grads.append(jnp.sqrt(jnp.sum(adj_hist[0, :, :] ** 2)))
-        if grads[-1] <= tolerance:
-            cfg.optim.Nopt = it + 1
-            break
+        # Halting condition : norm of the gradient
+        # if grads[-1] <= tolerance:
+        #     cfg.optim.Nopt = it + 1
+        #    break
 
         if line_search_opt:
             inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(),
