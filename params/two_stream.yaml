@@ -2,7 +2,7 @@ method: predcorr
 physics:
   charge: -1.0
   mass: 1.0
-  knudsen: 1
+  #knudsen: 1
 interp:
   order: 3
 grid:
@@ -17,9 +17,9 @@ inicond:
   k: 0.2
 time:
   nt_max: 4000
-  dt: 1.5
-  tend: 40
-  plot_freq: 1
+  dt: 0.1
+  tend: 30
+  plot_freq: 50
 optim:
   target: two_stream
   eps: 0.05
