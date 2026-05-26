@@ -11,6 +11,8 @@ dependencies = [
     "matplotlib>=3.8.0",
     "scienceplots>=2.1.0",
     "PyYAML>=6.0",
+    "flax>=0.12.7",
+    "optax>=0.2.8",
     # NVIDIA GPU wheels are published for Linux only (see JAX docs). Elsewhere: CPU jaxlib.
     "jax[cuda12]>=0.4.28; sys_platform == 'linux'",
     "jax>=0.4.28; sys_platform != 'linux'",

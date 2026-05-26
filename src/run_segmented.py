@@ -5,6 +5,9 @@ from .sim import run_time_loop
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
+import pickle 
+from .inr_compression import compress_inr
+
 def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path, data_dir: Path) -> jnp.ndarray:
     """Apply SVD, plot the spectrum, calculate the error and reconstruct the distribution f with rank r"""
     #SVD calculation
@@ -67,11 +70,15 @@ def main():
     
     original_case = cfg.inicond.case 
     
-    #creating specific folders to be able to compare the results
+    #creating specific folders depending on the compression method and rank (for POD)
+    compression = cfg.io.compression_method
+    
     if cfg.io.compression_method == "POD":
         segmented_case = f"{original_case}_segmented_POD_r{args.rank}"
+    elif compression == "INR":
+        segmented_case = f"{original_case}_segmented_INR"
     else: 
-        segmented_case = f"{original_case}_segmented"
+        segmented_case = f"{original_case}_segmented_NO_COMPRESSION"
     
     cfg.inicond.case = segmented_case
     
@@ -87,6 +94,8 @@ def main():
     current_time = 0.0
     cfg.io.restart.enabled = False 
     cfg.io.restart.file = None 
+    
+    current_nn_params = None
     
     while current_time < final_time - 1e-9:
         next_time = min(current_time + dt_seg, final_time)
@@ -104,27 +113,39 @@ def main():
         
         #interception and compression
         file_path = cfg.paths.data_dir / "f_final.npz"
+        data = jnp.load(file_path)
+        f_full = data['f']
+        t_saved = data['t']
+        it_saved = data['it']
         
-        if cfg.io.compression_method == "POD":
+        plot_dir = cfg.paths.save_dir.parent / segmented_case / "plots"
+        plot_dir.mkdir(parents=True, exist_ok=True)
+        
+        if compression == "POD":
             print(f"\n[POD] Applying compression (rank={args.rank}) to saved state...")
-            data = jnp.load(file_path)
-            f_full = data['f']
-            t_saved = data['t']
-            it_saved = data['it']
-            
-            plot_dir = cfg.paths.save_dir.parent / segmented_case / "plots"
-            plot_dir.mkdir(parents=True, exist_ok=True)
-            
             f_comp = compress_pod(f_full, args.rank, current_time, plot_dir, cfg.paths.data_dir)
-            
             #overwrite the saved state with the compressed version
             jnp.savez(file_path, f=f_comp, t=t_saved, it=it_saved)
             print(f"[POD] Done\n")
+            
+        elif compression == "INR":
+            print(f"\n[INR] Applying Neural Network compression...")
+            f_comp, current_nn_params = compress_inr(
+                f_full=f_full,
+                grid_X=cfg.grid.X,
+                grid_V=cfg.grid.V,
+                params_init=current_nn_params
+            )
+            
+            jnp.savez(file_path, f=f_comp, t=t_saved, it=it_saved)
+            weights_path = cfg.paths.data_dir / f"nn_weights_t{current_time:05.2f}.pkl"
+            with open(weights_path, "wb") as f_weights:
+                pickle.dump(current_nn_params, f_weights)
+                
+            print(f"[INR] Done (Weights saved to {weights_path.name})\n")
         
         cfg.io.restart.enabled = True
         cfg.io.restart.file = str(file_path)
-        
-        
         
     print(f"\n Segmented simulation finished successfully. Results saved in '{new_save_dir}' ")
     
