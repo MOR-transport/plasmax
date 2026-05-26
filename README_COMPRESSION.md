@@ -1,14 +1,14 @@
-# Segmented Simulation & POD Compression
+# Segmented Simulation & Data Compression
 
-This module introduces the ability to run PlasmaX simulations in segments and dynamically compress the saved restart files using Proper Orthogonal Decomposition (SVD).
+This module introduces the ability to run PlasmaX simulations in segments and dynamically compress the saved restart files using either Proper Orthogonal Decomposition (SVD) or Implicit Neural Representations (INR).
 
 ## Features
 
 - **Segmented Runs:** Simulation stops and restarts automatically at intervals defined by `io.dt_save` in the `.yaml` config file.
 - **POD Compression:** Compresses the Vlasov distribution function $f(x,v)$ at each save point using SVD.
 - **INR Compression:** Compresses the data by training a Multi-Layer Perceptron (MLP) to learn the continuous representation of $f(x,v)$. Features mini-batch training and "warm-starting" (transferring weights between time segments) for fast convergence
-- **Spectrum Analysis:** Automatically computes the relative Frobenius error caused by truncation and saves the normalized singular value spectrum plot at each compression step.
-- - **Error Tracking & Comparison:** Stores the history of Frobenius errors in `pod_frobenius_errors.csv` and allows direct multi-run error comparison over time.
+- **Spectrum Analysis (POD):** Automatically computes the relative Frobenius error caused by truncation and saves the normalized singular value spectrum plot at each compression step.
+- - **Error Tracking:** Stores the history of Frobenius errors in `pod_frobenius_errors.csv` and allows direct multi-run error comparison over time.
 
 ## How to Run
 
