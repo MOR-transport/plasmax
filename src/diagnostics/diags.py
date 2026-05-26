@@ -140,7 +140,17 @@ def main():
     if args.output_dir:
         figure_dir = Path(args.output_dir)
     elif len(args.params) > 1:
-        figure_dir = Path("results/comparisons")
+        first_path = Path(args.params[0])
+        case_folder = next((p for p in first_path.parts if p.startswith("case_")), "case_unknown")
+        all_paths_str = " ".join(args.params)
+        if "INR" in all_paths_str and "POD" not in all_paths_str:
+            sub_folder = "baseline_vs_INR"
+        elif "POD" in all_paths_str and "INR" not in all_paths_str:
+            sub_folder = "baseline_vs_POD"
+        else:
+            sub_folder = "mixed_comparisons"
+        
+        figure_dir = Path("results") / case_folder / "comparisons" / sub_folder
     else:
         figure_dir = None
     

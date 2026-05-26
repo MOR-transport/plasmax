@@ -3,87 +3,40 @@ from pathlib import Path
 from .config import load_config, Paths 
 from .sim import run_time_loop 
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 
 import pickle 
-from .inr_compression import compress_inr
-
-def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path, data_dir: Path) -> jnp.ndarray:
-    """Apply SVD, plot the spectrum, calculate the error and reconstruct the distribution f with rank r"""
-    #SVD calculation
-    U, s, VT = jnp.linalg.svd(f, full_matrices=False)
-    
-    #calculation of the error in Frobenius norm
-    total_energy = jnp.sum(s**2)
-    truncated_energy = jnp.sum(s[rank:]**2)
-    error_frob = float(jnp.sqrt(truncated_energy / total_energy))
-    #error saving
-    error_file = data_dir / "pod_frobenius_errors.csv"
-    if not error_file.exists():
-        with open(error_file, "w") as f_err:
-            f_err.write("time,frobenius_error\n")
-    
-    with open(error_file, "a") as f_err:
-        f_err.write(f"{current_time:.4f},{error_frob:.6e}\n")
-    
-    #plot of the normalized singular spectrum
-    s_norm = s / s[0]
-    
-    fig, ax = plt.subplots(figsize=(8, 6))    
-    ax.semilogy(s_norm, marker='o', linestyle='', color='#1f77b4', markersize=5, alpha=0.8, label=r"Normalized $\sigma_i$")    
-    ax.axvline(x=rank, color='#d62728', linestyle='--', linewidth=2, label=f'Truncation $r={rank}$')    
-    ax.set_xlabel(r'Singular Value Index $i$', fontsize=14, labelpad=10)
-    ax.set_ylabel(r'$\sigma_i / \sigma_1$', fontsize=14, labelpad=10)
-    ax.set_title(f'Normalized SVD Spectrum at $t={current_time:.2f}$', fontsize=16, pad=15)    
-    ax.grid(True, which='major', linestyle='-', alpha=0.5)
-    ax.grid(True, which='minor', linestyle=':', alpha=0.2)
-    ax.legend(loc='upper right', fontsize=12, frameon=True, edgecolor='black', fancybox=False, facecolor='white', framealpha=1.0)
-    fig.tight_layout()
-    fig.savefig(plot_dir / f"svd_spectrum_t{current_time:05.2f}.png", dpi=300, bbox_inches='tight')
-    plt.close(fig)
-    
-    #Truncation
-    U_r = U[:, :rank]
-    s_r = s[:rank]
-    VT_r = VT[:rank, :]
-    
-    #reconstruction
-    f_comp = (U_r * s_r) @ VT_r
-    
-    print(f"-> Frobeniurs Error: {error_frob:.2e}")
-    
-    return f_comp   
-
+from .compression import compress_inr, compress_pod
 def main():
     parser = argparse.ArgumentParser(description="Run PlasmaX simulation in segments.")
     parser.add_argument("--params", type=str, required=True, help="Base yaml config file")
     parser.add_argument("--tend", type=float, default=None, help="Total simulation time")
     parser.add_argument("--rank", type=int, default=32, help="Rank for POD compression")
+    parser.add_argument("--compression", type=str, choices=["POD", "INR", "NONE"], default=None, help="Override yaml compression method")
     args = parser.parse_args()
     
     #base configuration
     cfg = load_config(args.params)  
-    
     final_time = args.tend if args.tend is not None else cfg.time.tend
-    
     dt_seg = cfg.io.dt_save if cfg.io.dt_save is not None else 5.0
     
     original_case = cfg.inicond.case 
-    
     #creating specific folders depending on the compression method and rank (for POD)
-    compression = cfg.io.compression_method
+    compression = args.compression if args.compression is not None else cfg.io.compression_method
+    cfg.inicond.case = f"{original_case}_segmented"
+    case_root = Path("results") / f"case_{original_case}"
     
-    if cfg.io.compression_method == "POD":
-        segmented_case = f"{original_case}_segmented_POD_r{args.rank}"
+    if compression == "POD":
+        folder_name = f"r{args.rank}"
+        new_save_dir = case_root / "segmented" / "POD" / folder_name
     elif compression == "INR":
-        segmented_case = f"{original_case}_segmented_INR"
+        folder_name = f"inr_compression"
+        new_save_dir = case_root / "segmented" / "INR" / folder_name
     else: 
-        segmented_case = f"{original_case}_segmented_NO_COMPRESSION"
+        folder_name = "NO_COMPRESSION"
+        new_save_dir = case_root / "segmented" / folder_name
     
-    cfg.inicond.case = segmented_case
-    
-    new_save_dir = cfg.paths.save_dir.parent / segmented_case
-    cfg.paths = Paths.from_case(segmented_case, new_save_dir)
+    #paths update in the configuration
+    cfg.paths = Paths.from_case(cfg.inicond.case, new_save_dir)
     cfg.paths.data_dir.mkdir(parents=True, exist_ok=True)
     
     #clean up the old csv file if we restart the experiment from scratch
@@ -94,7 +47,6 @@ def main():
     current_time = 0.0
     cfg.io.restart.enabled = False 
     cfg.io.restart.file = None 
-    
     current_nn_params = None
     
     while current_time < final_time - 1e-9:
@@ -106,9 +58,7 @@ def main():
         
         #update of end time for this segment
         cfg.time.tend = next_time
-        
         run_time_loop(cfg)
-        
         current_time = next_time
         
         #interception and compression
@@ -118,7 +68,7 @@ def main():
         t_saved = data['t']
         it_saved = data['it']
         
-        plot_dir = cfg.paths.save_dir.parent / segmented_case / "plots"
+        plot_dir = cfg.paths.save_dir.parent / folder_name / "plots"
         plot_dir.mkdir(parents=True, exist_ok=True)
         
         if compression == "POD":
