@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import numpy as np
 import importlib
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -89,6 +90,60 @@ def save_figure(fig: plt.Figure, output_path: Path, fmt: str = "both"):
         tex_path = output_path.with_suffix(".tex")
         export2tikz(fig, tex_path)
 
+#Palette fixe par architecture INR 
+INR_ARCH_STYLES: dict[str, dict] = {
+    "mlp_16": {"color": "#888787", "linestyle": "--",  "marker": "s", "label": "MLP 16×3 (baseline)"},
+    "mlp_64":      {"color": "#4C9BE8", "linestyle": "-",   "marker": "o", "label": "MLP 64×3"},
+    "mlp_128":     {"color": "#2563EB", "linestyle": "-",   "marker": "D", "label": "MLP 128×3"},
+    "deep_128":    {"color": "#7C3AED", "linestyle": "-.",  "marker": "^", "label": "Deep 128×5"},
+    "siren":       {"color": "#E85D04", "linestyle": "-",   "marker": "*", "label": "SIREN 64×3"},
+    "siren_128":   {"color": "#F59E0B", "linestyle": "-.",  "marker": "v", "label": "SIREN 128×3"},
+    "fourier_mlp": {"color": "#059669", "linestyle": "-",   "marker": "P", "label": "Fourier MLP"},
+}
+
+def arch_style(arch: str) -> dict:
+    """
+    Returns the matplotlib style for a given architecture.
+    Generates a fallback style for any unknown architecture.
+    """
+    if arch in INR_ARCH_STYLES:
+        return INR_ARCH_STYLES[arch]
+    #Fallback: couleur dérivée du nom
+    import hashlib
+    h = int(hashlib.md5(arch.encode()).hexdigest()[:6], 16)
+    r = ((h >> 16) & 0xFF) / 255
+    g = ((h >> 8)  & 0xFF) / 255
+    b = (h         & 0xFF) / 255
+    return {"color": (r, g, b), "linestyle": ":", "marker": "x", "label": arch}
+
+def load_inr_errors(data_dir: Path) -> dict[str, tuple[list, list]]:
+    inr_path = data_dir / "inr_errors.csv"
+    if not inr_path.exists():
+        return {}
+    
+    arch_data: dict[str, tuple[list, list]] = {}
+    try:
+        with open(inr_path, "r") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                arch = row["arch"].strip()
+                t = float(row["time"])
+                err = float(row["frobenius_error"])
+                if arch not in arch_data:
+                    arch_data[arch] = ([], [])
+                arch_data[arch][0].append(t)
+                arch_data[arch][1].append(err)
+    except Exception as e:
+        print(f"Warning: could not read {inr_path}: {e}")
+        
+    return arch_data
+    
+def plot_frob_errors():
+    """ 
+    
+    """
+    
+    
 
 def main():
     parser = argparse.ArgumentParser(description="Generate plots from diagnostics.csv")
