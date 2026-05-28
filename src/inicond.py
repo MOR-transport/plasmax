@@ -1,10 +1,10 @@
 import jax
-jax.config.update("jax_enable_x64", True)
-
 import jax.numpy as jnp
 from abc import ABC, abstractmethod
 
 from .config import Config
+
+jax.config.update("jax_enable_x64", True)
 
 
 class TestCase(ABC):
@@ -49,14 +49,14 @@ class BumpOnTail(TestCase):
         self.nb = nb
 
     def get_initcond(self, x, v) -> jnp.ndarray:
-        gauss_1 = jnp.exp(-(v ** 2) / 2) * ( (1 - self.nb) / jnp.sqrt(2 * jnp.pi) )
-        gauss_2 = jnp.exp(-((v - self.vd) ** 2) / (2 * self.vt**2)) * ( self.nb / (jnp.sqrt(2 * jnp.pi) * self.vt) )
+        gauss_1 = jnp.exp(-(v ** 2) / 2) * ((1 - self.nb) / jnp.sqrt(2 * jnp.pi))
+        gauss_2 = jnp.exp(-((v - self.vd) ** 2) / (2 * self.vt**2)) * (self.nb / (jnp.sqrt(2 * jnp.pi) * self.vt))
         return (1 + self.eps * jnp.cos(self.k * x)) * (gauss_1 + gauss_2)
 
 
 def _create_experiment(ic) -> TestCase:
     expname = getattr(ic, "case", getattr(ic, "target", None))
-    
+
     if expname == "landau_damping":
         return LandauDamping(ic.alpha, ic.k)
     elif expname == "two_stream":
@@ -71,8 +71,8 @@ def get_inicond(cfg: Config):
     case_name = cfg.inicond.case
 
     if "_segmented" in case_name:
-        exp_name_base = case_name.split("_segmented")[0] 
-        
+        exp_name_base = case_name.split("_segmented")[0]
+
         if exp_name_base == "landau_damping":
             experiment = LandauDamping(cfg.inicond.alpha, cfg.inicond.k)
         elif exp_name_base == "two_stream":
@@ -81,8 +81,8 @@ def get_inicond(cfg: Config):
             experiment = BumpOnTail(cfg.inicond.k, cfg.inicond.eps, cfg.inicond.vd, cfg.inicond.vt, cfg.inicond.nb)
         else:
             raise ValueError(f"Unknown base case for segmented run: {exp_name_base!r}")
-        return experiment.get_initcond 
-    
+        return experiment.get_initcond
+
     experiment = _create_experiment(cfg.inicond)
     return experiment.get_initcond
 

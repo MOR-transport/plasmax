@@ -136,22 +136,22 @@ def main():
     }
 
     cases_data = []
-    
+
     if args.output_dir:
         figure_dir = Path(args.output_dir)
     elif len(args.params) > 1:
         figure_dir = Path("results/comparisons")
     else:
         figure_dir = None
-    
+
     for params_path_str in args.params:
         params_path = Path(params_path_str)
         if not params_path.exists():
             print(f"Warning: Params file '{params_path}' not found. Skipping.")
             continue
-        
+
         if params_path.suffix == ".csv":
-            case_name = params_path.parent.parent.name 
+            case_name = params_path.parent.parent.name
             csv_path = params_path
             if figure_dir is None:
                 figure_dir = params_path.parent.parent / "plots"
@@ -161,7 +161,7 @@ def main():
             csv_path = cfg.paths.data_dir / "diagnostics.csv"
             if figure_dir is None:
                 figure_dir = cfg.paths.plot_dir
-                
+
         if not csv_path.exists():
             print(f"Warning: {csv_path} not found for {case_name}. Run simulation first.")
             continue
@@ -225,47 +225,48 @@ def main():
         output_path = figure_dir / filename
         save_figure(fig, output_path, args.format)
         plt.close(fig)
-    
-    #Frobenius error plot
+
+    # Frobenius error plot
     if args.frob or args.all:
         import numpy as np
         fig, ax = plt.subplots(figsize=(8, 6))
         plotted_frob = False
-        
+
         for case in cases_data:
             frob_path = case["csv_path"].parent / "pod_frobenius_errors.csv"
-            
+
             if frob_path.exists():
                 try:
                     frob_data = np.genfromtxt(frob_path, delimiter=',', skip_header=1)
-                    
+
                     if frob_data.ndim == 1:
                         frob_data = frob_data.reshape(1, -1)
-                        
+
                     if frob_data.shape[1] >= 2:
                         times_frob = frob_data[:, 0]
                         errors_frob = frob_data[:, 1]
-                        
-                        #tracé en échelle logarithmique pour mieux visualiser les erreurs
+
+                        # Logarithmic scale for better plotting of the errors
                         ax.semilogy(
-                            times_frob, errors_frob, 
-                            marker='o', linestyle='-', linewidth=2, markersize=6, alpha=0.8,
+                            times_frob, errors_frob,
+                            marker='o', linestyle='-', linewidth=2,
+                            markersize=6, alpha=0.8,
                             label=case["name"]
                         )
                         plotted_frob = True
                 except Exception as e:
                     print(f"Warning: Could not read {frob_path}: {e}")
-        
+
         if plotted_frob:
             ax.set_xlabel("Time", fontsize=14, labelpad=10)
             ax.set_ylabel("Relative Frobenius Error", fontsize=14, labelpad=10)
             ax.set_title("POD Truncation Error Over Time", fontsize=16, pad=15)
             ax.legend(loc="best", fontsize=12, frameon=True, edgecolor='black')
-            
+
             ax.grid(True, which='major', linestyle='-', alpha=0.5)
             ax.grid(True, which='minor', linestyle=':', alpha=0.2)
             fig.tight_layout()
-            
+
             filename = "frob_error_comparison" if len(cases_data) > 1 else f"frob_error_{cases_data[0]['name']}"
             save_figure(fig, figure_dir / filename, args.format)
         plt.close(fig)

@@ -41,7 +41,7 @@ def run_time_loop_adjoint(cfg, Efield, src, verbose=False):
         t0 = time_module.perf_counter()
 
         f = advect_with_source_hist(f, Efield[-it, :], grid, cfg.time.dt, cfg.interp.order, src, -it)
-        
+
         t += cfg.time.dt
         tcpu.append(time_module.perf_counter() - t0)
 
@@ -73,22 +73,22 @@ def line_search_step(cfg, alpha, inicond, adj):
 
 def line_search(cfg, inicond, f, fexp, adj, alpha_init, m=1e-4, theta=0.5):
     alpha = alpha_init
-    
+
     if alpha <= 1e-8:
         return line_search_step(cfg, alpha, inicond, adj)
-    
+
     J = lambda f: functionnal(cfg, f, fexp)
-    
+
     while True:
         print(f"\nTRY ALPHA = {alpha}")
 
         inicond_tmp, f_new, Efield_new, alpha = line_search_step(cfg, alpha,
                                                                  inicond, adj)
-        
+
         armijo_cond = J(f_new) <= J(f) - m*alpha*jnp.sum(adj**2)
         if armijo_cond:
             return inicond_tmp, f_new, Efield_new, alpha
-        
+
         alpha *= theta
         if alpha <= 1e-8:
             return line_search_step(cfg, alpha, inicond, adj)
@@ -100,14 +100,14 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
     inicond_exp = get_inicond_exp(cfg)(cfg.grid.X, cfg.grid.V)
     f_exp, _ = run_time_loop(cfg, inicond=inicond_exp, verbose=False)
 
-    inicond_initiale = get_inicond(cfg)(cfg.grid.X, cfg.grid.V)  
+    inicond_initiale = get_inicond(cfg)(cfg.grid.X, cfg.grid.V)
     inicond = inicond_initiale.copy()
     residuals = []
     alphas = []
     grads = []
     stepsize = cfg.optim.lr
 
-    folder = Path(f"plots/optimization/default_optim/")
+    folder = Path("plots/optimization/default_optim/")
     folder_it = folder / "iterations"
 
     if folder.exists() and folder.is_dir():
@@ -126,11 +126,11 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
         print(f"##### Iteration {it:3d} #####")
         residuals.append(functionnal(cfg, f_hist, f_exp))
         # Halting condition : progress in the objective function
-        if it>1 and residuals[-2]-residuals[-1] < tolerance*residuals[-2]:
+        if it > 1 and residuals[-2]-residuals[-1] < tolerance*residuals[-2]:
             cfg.optim.Nopt = it
             print("Insufficient progression")
             break
-        
+
         src = compute_src(cfg, f_hist, f_exp)
         adj_hist = run_time_loop_adjoint(cfg, Efield_hist, src, verbose=False)
 
@@ -168,11 +168,11 @@ def optimize(cfg):
 
     adjoint(cfg, line_search_opt=True, format="png")
 
-    
+
 def main():
     parser = argparse.ArgumentParser(description="Vlasov–Poisson driver (predcorr / NuFI stub).")
     parser.add_argument("--params", type=str, required=True, help="Base yaml config file")
     args = parser.parse_args()
-    
+
     cfg = load_config(args.params)
     optimize(cfg)

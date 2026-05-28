@@ -44,24 +44,24 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
     """Advance ``f`` until ``time >= cfg.time.tend`` or ``nt_max`` steps."""
     grid = cfg.grid
 
-    # f and t initialization 
+    # f and t initialization
     if cfg.io.restart.enabled and cfg.io.restart.file:
-        restart_path = Path(cfg.io.restart.file) 
+        restart_path = Path(cfg.io.restart.file)
         if not restart_path.exists():
             raise FileNotFoundError(f"Restart file '{restart_path}' not found.")
-        
+
         # Loading .npz archive
         data = jnp.load(restart_path)
         f = data['f']
         t = float(data["t"])
         it_offset = int(data["it"])
-        
+
         # Check the compatibility of the dimensions
         if f.shape != (grid.nv, grid.nx):
             raise ValueError(f"Restart file shape {f.shape} != grid shape ({grid.nv}, {grid.nx})")
-        
+
         print(f"Restarting from {restart_path} at t = {t:.6g}")
-    
+
     else:
         if inicond is None:
             f0 = get_inicond(cfg)
@@ -71,11 +71,11 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
         t = 0.0
         it_offset = 0  # No offset if we start at 0
         if verbose:
-            print(f"Starting from analytical initial condition")
-        
+            print("Starting from analytical initial condition")
+
     rho = compute_density(f, grid.dv)
     Efield = vpoisson(rho, grid, cfg.physics.charge)
-    
+
     if cfg.time.plot_freq > 0:
         folder = Path("plots/simulation/sim_default")
         folder_f = folder / "iterations/solution"
@@ -93,12 +93,12 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
     # Number of iterations from the initial time
     remaining = max(0.0, cfg.time.tend - t)
     nt_cap = min(cfg.time.nt_max, int(math.ceil(remaining / cfg.time.dt)))
-    if nt_cap <=0: 
+    if nt_cap <= 0:
         print("Nothing to simulate (tend already reached).")
-        return jnp.empty((0, grid.nv, grid.nx)), jnp.empty((0, grid.nx))        
-    
+        return jnp.empty((0, grid.nv, grid.nx)), jnp.empty((0, grid.nx))
+
     tcpu = []
-    
+
     if nb_profile > 0:
         fig, axs = plt.subplots(2, 1, figsize=(16, 10))
 
@@ -109,8 +109,8 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
 
     Efield_hist = jnp.empty((nt_cap+1, grid.nx), dtype=jnp.float64)
     Efield_hist = Efield_hist.at[0, :].set(Efield)
-    
-    global_it = it_offset 
+
+    global_it = it_offset
     if global_it == 0:
         measure(cfg, f, Efield, global_it, t)
     for it in range(1, nt_cap + 1):
@@ -123,7 +123,7 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
 
         f_hist = f_hist.at[it, :, :].set(f)
         Efield_hist = Efield_hist.at[it, :].set(Efield)
-        
+
         measure(cfg, f, Efield, global_it, t)
 
         if verbose:
