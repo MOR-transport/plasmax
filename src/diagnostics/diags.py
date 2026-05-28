@@ -92,13 +92,16 @@ def save_figure(fig: plt.Figure, output_path: Path, fmt: str = "both"):
 
 #Palette fixe par architecture INR 
 INR_ARCH_STYLES: dict[str, dict] = {
-    "mlp_16": {"color": "#888787", "linestyle": "--",  "marker": "s", "label": "MLP 16×3 (baseline)"},
+    "mlp_16": {"color": "#888787", "linestyle": "--",  "marker": "s", "label": "MLP 16×3"},
     "mlp_64":      {"color": "#4C9BE8", "linestyle": "-",   "marker": "o", "label": "MLP 64×3"},
     "mlp_128":     {"color": "#2563EB", "linestyle": "-",   "marker": "D", "label": "MLP 128×3"},
-    "deep_128":    {"color": "#7C3AED", "linestyle": "-.",  "marker": "^", "label": "Deep 128×5"},
+    "deep_128":    {"color": "#7C3AED", "linestyle": "-.",  "marker": "^", "label": "MLP DEEP 128×5"},
     "siren":       {"color": "#E85D04", "linestyle": "-",   "marker": "*", "label": "SIREN 64×3"},
     "siren_128":   {"color": "#F59E0B", "linestyle": "-.",  "marker": "v", "label": "SIREN 128×3"},
-    "fourier_mlp": {"color": "#059669", "linestyle": "-",   "marker": "P", "label": "Fourier MLP"},
+    "siren_deep_128": {"color": "#FFFB0B", "linestyle": "-",  "marker": "X", "label": "SIREN DEEP 128×5"},
+    "fourier_mlp": {"color": "#089266", "linestyle": "-",   "marker": "P", "label": "Fourier MLP 64×3"},
+    "fourier_mlp_128": {"color": "#2CD237", "linestyle": "-.",   "marker": "P", "label": "Fourier MLP 128×3"},
+    "fourier_mlp_deep_128": {"color": "#26FF00", "linestyle": "-",   "marker": "P", "label": "Fourier MLP DEEP 128×5"},
 }
 
 def arch_style(arch: str) -> dict:
@@ -138,11 +141,159 @@ def load_inr_errors(data_dir: Path) -> dict[str, tuple[list, list]]:
         
     return arch_data
     
-def plot_frob_errors():
+def plot_frob_errors(cases_data: list[dict], figure_dir: Path,fmt: str, show_inr: bool = True, show_pod: bool = True):
     """ 
-    
+    Generate frobenius error plot
     """
+    fig, ax = plt.subplots(figsize=(9, 6))
+    plotted_any = False
+
+    #POD
+    if show_pod:
+        for case in cases_data:
+            frob_path = case["csv_path"].parent / "pod_frobenius_errors.csv"
+            if not frob_path.exists():
+                continue
+            try:
+                frob_data = np.genfromtxt(frob_path, delimiter=",", skip_header=1)
+                if frob_data.ndim == 1:
+                    frob_data = frob_data.reshape(1, -1)
+                if frob_data.shape[1] >= 2:
+                    times_frob = frob_data[:, 0]
+                    errors_frob = frob_data[:, 1]
+                    ax.semilogy(
+                        times_frob, errors_frob,
+                        linestyle="-", linewidth=2.5,
+                        marker="o", markersize=5, alpha=0.85,
+                        label=f"POD — {case['name']}",
+                    )
+                    plotted_any = True
+            except Exception as e:
+                print(f"Warning: Could not read {frob_path}: {e}")
+
+    # INR
+    if show_inr:
+        already_plotted_archs = set()  # évite les doublons si plusieurs csv du même arch
+
+        for case in cases_data:
+            arch_data = load_inr_errors(case["csv_path"].parent)
+            
+            if not arch_data:
+                data_dir = case["csv_path"].parent
+                folder_name = data_dir.parent.name          
+                if folder_name.startswith("inr_"):
+                    guessed_arch = folder_name[4:]         
+                    print(f"  Info: inr_errors.csv missing for :'{case['name']}', "
+                          f"architecture deduced from the file : '{guessed_arch}'")
+                continue
+
+            for arch, (times, errors) in arch_data.items():
+                if arch in already_plotted_archs or not times:
+                    continue
+                style = arch_style(arch)
+                ax.semilogy(
+                    times, errors,
+                    color=style["color"],
+                    linestyle=style["linestyle"],
+                    linewidth=2,
+                    marker=style["marker"],
+                    markersize=6,
+                    alpha=0.9,
+                    label=style["label"],
+                )
+                already_plotted_archs.add(arch)
+                plotted_any = True
+
+    if not plotted_any:
+        print("Warning: No Frobenius error data found (POD or INR).")
+        plt.close(fig)
+        return
+
+    ax.set_xlabel("Time", fontsize=14, labelpad=10)
+    ax.set_ylabel("Relative Frobenius Error", fontsize=14, labelpad=10)
+
+    if show_pod and show_inr:
+        title = "Compression Error: POD vs INR (All Architectures)"
+    elif show_inr:
+        title = "INR Compression Error — Architecture Comparison"
+    else:
+        title = "POD Truncation Error"
+    ax.set_title(title, fontsize=15, pad=14)
+
+    ax.legend(loc="best", fontsize=11, frameon=True, edgecolor="#cbd5e1", framealpha=0.9)
+    ax.grid(True, which="major", linestyle="-",  alpha=0.4)
+    ax.grid(True, which="minor", linestyle=":",  alpha=0.15)
+    fig.tight_layout()
+
+    if show_pod and show_inr:
+        filename = "frob_error_pod_vs_inr"
+    elif show_inr:
+        filename = "frob_error_inr_archs"
+    else:
+        filename = (
+            "frob_error_comparison" if len(cases_data) > 1
+            else f"frob_error_{cases_data[0]['name']}"
+        )
+
+    save_figure(fig, figure_dir / filename, fmt)
+    plt.close(fig)
+        
+def plot_inr_loss_curves(cases_data: list[dict], figure_dir: Path,fmt: str):
+    """ 
+    Final loss per segment for each INR architecture for diagnosing convergence indepenently of physical error
+    """    
+    inr_loss_path_found = False 
+    fig, ax = plt.subplots(figsize=(9, 5))
     
+    for case in cases_data:
+        inr_path = case["csv_path"].parent / "inr_errors.csv"
+        if not inr_path.exists():
+            continue 
+        
+        inr_loss_path_found = True
+        arch_loss: dict[str, tuple[list, list]] = {}
+        try:
+            with open(inr_path, "r") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    arch = row["arch"].strip()
+                    t = float(row["time"])
+                    loss = float(row["final_loss"])
+                    if arch not in arch_loss:
+                        arch_loss[arch] = ([], [])
+                    arch_loss[arch][0].append(t)
+                    arch_loss[arch][1].append(loss)           
+        except Exception as e:
+            print(f"Warning: could not read {inr_path}: {e}")
+            continue
+        
+        for arch, (times, losses) in arch_loss.items():
+            style = arch_style(arch)
+            ax.semilogy(
+                times, losses,
+                color=style["color"],
+                linestyle=style["linestyle"],
+                linewidth=1.8,
+                marker=style["marker"],
+                markersize=5,
+                alpha=0.9,
+                label=style["label"],
+            )
+    
+    if not inr_loss_path_found:
+        plt.close(fig)
+        return 
+    
+    ax.set_xlabel("Time", fontsize=14, labelpad=10)
+    ax.set_ylabel("Final loss (MSE)", fontsize=14, labelpad=10)
+    ax.set_title("INR convergence per segment - Comparison of architectures", fontsize=15, pad=14)
+    ax.legend(loc="best", fontsize=11, frameon=True, edgecolor="#cbd5e1", framealpha=0.9)
+    ax.grid(True, which="major", linestyle="-", alpha=0.4)
+    ax.grid(True, which="minor", linestyle=":", alpha=0.15)
+    fig.tight_layout()
+    
+    save_figure(fig, figure_dir / "inr_loss_convergence", fmt)
+    plt.close(fig)        
     
 
 def main():
@@ -155,16 +306,18 @@ def main():
     parser.add_argument("--mass", action="store_true", help="Plot Mass")
     parser.add_argument("--momentum", action="store_true", help="Plot Momentum")
     parser.add_argument("--l2norm", action="store_true", help="Plot L2 Norm")
-    parser.add_argument("--frob", action="store_true", help="Plot Frobenius Error")
+    parser.add_argument("--frob", action="store_true", help="Plot Frobenius Error (POD + INR all architectures)")
+    parser.add_argument("--frob-pod", action = "store_true", help="Plot only the Frobenius error of POD")
+    parser.add_argument("--frob-inr", action = "store_true", help="Plot only the Frobenius error of INR (all architectures)")
+    parser.add_argument("--inr-loss", action="store_true", help="Plot the INR final loss per segment and per architecture")
     parser.add_argument("--all", action="store_true", help="Generate all plots (default if no specific flags)")
-
     parser.add_argument("--format", choices=["png", "tex", "both"], default="both", help="Output format (default: both)")
-
     parser.add_argument("--output-dir", type=str, default=None, help="Override output directory")
 
     args = parser.parse_args()
 
-    if not any((args.epot, args.ekin, args.etot, args.mass, args.momentum, args.l2norm)):
+    if not any((args.epot, args.ekin, args.etot, args.mass, args.momentum,
+                args.l2norm, args.frob, args.frob_pod, args.frob_inr, args.inr_loss)):
         args.all = True
 
     quantities = []
@@ -246,9 +399,9 @@ def main():
     assert figure_dir is not None
     figure_dir.mkdir(parents=True, exist_ok=True)
 
+    #physical curves
     for quantity in quantities:
         csv_key = name_mapping[quantity]
-
         fig, ax = plt.subplots(figsize=(8, 5))
 
         for case in cases_data:
@@ -264,77 +417,43 @@ def main():
             )
 
         ax.set_xlabel("Time", fontsize=12)
-
-        labels = {
-            "epot": ("Electric Potential Energy", r"$E_{pot}$"),
-            "ekin": ("Kinetic Energy", r"$E_{kin}$"),
-            "etot": ("Total Energy", r"$E_{tot}$"),
-            "mass": ("Mass", "Mass"),
-            "momentum": ("Momentum", "Momentum"),
-            "l2norm": ("L2 Norm", r"$L_2$ norm"),
-        }
-
-        title, ylabel = labels[quantity]
-        ax.set_ylabel(ylabel, fontsize=12)
-        ax.set_title(title, fontsize=12)
-        ax.legend(loc="best")
-        ax.grid(True, alpha=0.3)
-
+        ax.set_ylabel(quantity.upper(), fontsize=14, labelpad=10)
+        ax.set_title(f"{quantity.upper()} over Time", fontsize=16, pad=15)
+        ax.legend(loc="best", fontsize=12, frameon=True, edgecolor='black')
+        ax.grid(True, which='major', linestyle='-', alpha=0.5)
+        ax.grid(True, which='minor', linestyle=':', alpha=0.2)
         fig.tight_layout()
 
-        if len(cases_data) == 1:
-            filename = f"{quantity}_{cases_data[0]['name']}"
+        if len(cases_data) > 1:
+            filename = f"{quantity}_comparison"
         else:
-            filename = f"{quantity}_comparaison"
+            filename = f"{quantity}_{cases_data[0]['name']}"
 
         output_path = figure_dir / filename
         save_figure(fig, output_path, args.format)
         plt.close(fig)
+        
     
     #Frobenius error plot
-    if args.frob or args.all:
-        import numpy as np
-        fig, ax = plt.subplots(figsize=(8, 6))
-        plotted_frob = False
-        
-        for case in cases_data:
-            frob_path = case["csv_path"].parent / "pod_frobenius_errors.csv"
-            
-            if frob_path.exists():
-                try:
-                    frob_data = np.genfromtxt(frob_path, delimiter=',', skip_header=1)
-                    
-                    if frob_data.ndim == 1:
-                        frob_data = frob_data.reshape(1, -1)
-                        
-                    if frob_data.shape[1] >= 2:
-                        times_frob = frob_data[:, 0]
-                        errors_frob = frob_data[:, 1]
-                        
-                        #tracé en échelle logarithmique pour mieux visualiser les erreurs
-                        ax.semilogy(
-                            times_frob, errors_frob, 
-                            marker='o', linestyle='-', linewidth=2, markersize=6, alpha=0.8,
-                            label=case["name"]
-                        )
-                        plotted_frob = True
-                except Exception as e:
-                    print(f"Warning: Could not read {frob_path}: {e}")
-        
-        if plotted_frob:
-            ax.set_xlabel("Time", fontsize=14, labelpad=10)
-            ax.set_ylabel("Relative Frobenius Error", fontsize=14, labelpad=10)
-            ax.set_title("POD Truncation Error Over Time", fontsize=16, pad=15)
-            ax.legend(loc="best", fontsize=12, frameon=True, edgecolor='black')
-            
-            ax.grid(True, which='major', linestyle='-', alpha=0.5)
-            ax.grid(True, which='minor', linestyle=':', alpha=0.2)
-            fig.tight_layout()
-            
-            filename = "frob_error_comparison" if len(cases_data) > 1 else f"frob_error_{cases_data[0]['name']}"
-            save_figure(fig, figure_dir / filename, args.format)
-        plt.close(fig)
-
+    #pod + inr on the same plot
+    if args.all or args.frob:
+        plot_frob_errors(cases_data, figure_dir, args.format,
+                         show_inr=True, show_pod=True)
+ 
+    # pod only
+    if args.frob_pod:
+        plot_frob_errors(cases_data, figure_dir, args.format,
+                         show_inr=False, show_pod=True)
+ 
+    # inr only, all architectures
+    if args.frob_inr:
+        plot_frob_errors(cases_data, figure_dir, args.format,
+                         show_inr=True, show_pod=False)
+ 
+    # final loss per segment
+    if args.all or args.inr_loss:
+        plot_inr_loss_curves(cases_data, figure_dir, args.format)
+ 
     print(f"\nPlots saved to {figure_dir}.")
 
 

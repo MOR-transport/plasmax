@@ -55,106 +55,60 @@ def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path,
     return f_comp   
 
 #INR Architecture Registry
-class MLP_16(nn.Module):
-    @nn.compact 
-    def __call__(self, x):
-        for _ in range(3):
-            x = nn.Dense(16)(x)
-            x = nn.tanh(x)
-        x = nn.Dense(1)(x)
-        return x
+def make_mlp(hidden_size: int, n_layers: int = 3):
+    class MLP(nn.Module):
+        @nn.compact 
+        def __call__(self, x):
+            for _ in range(n_layers):
+                x = nn.Dense(hidden_size)(x)
+                x = nn.tanh(x)
+            return nn.Dense(1)(x)
+    return MLP
 
-class MLP_64(nn.Module):
-    @nn.compact 
-    def __call__(self, x):
-        for _ in range(3):
-            x = nn.Dense(64)(x)
-            x = nn.tanh(x)
-        x = nn.Dense(1)(x)
-        return x
-    
-class MLP_128(nn.Module):
-    @nn.compact 
-    def __call__(self, x):
-        for _ in range(3):
-            x = nn.Dense(128)(x)
-            x = nn.tanh(x)
-        x = nn.Dense(1)(x)
-        return x
 
-class Deep_128(nn.Module):
-    @nn.compact 
-    def __call__(self, x):
-        for _ in range(5):
-            x = nn.Dense(128)(x)
-            x = nn.tanh(x)
-        x = nn.Dense(1)(x)
-        return x
+def make_siren(features: tuple, omega_0: float):
+    class SIREN(nn.Module):
+        @nn.compact 
+        def __call__(self, x):
+            x = nn.Dense(features[0])(x)
+            x = jnp.sin(omega_0 * x)
+            for feat in features[1:]:
+                x = nn.Dense(feat)(x)
+                x = jnp.sin(x)
+            x = nn.Dense(1)(x)
+            return x
+    return SIREN
 
-class SIREN(nn.Module):
-    """
-    Sinusoidal Representation Network
-    Activation sin(omega*x), special init for the first layer
-    """
-    features: tuple = (64, 64, 64)
-    omega_0: float = 30.0
-    
-    @nn.compact 
-    def __call__(self, x):
-        #première couche : scale différent
-        x = nn.Dense(self.features[0])(x)
-        x = jnp.sin(self.omega_0 * x)
-        #couches cachées
-        for feat in self.features[1:]:
-            x = nn.Dense(feat)(x)
-            x = jnp.sin(x)
-        x = nn.Dense(1)(x)
-        return x
-
-class SIREN_128(nn.Module):
-    features: tuple = (128, 128, 128)
-    omega_0: float = 30.0
-    
-    @nn.compact 
-    def __call__(self, x):
+def make_fourier_mlp(n_freqs: int, hidden: int, n_layers: int, sigma: float):
+    class FourierMLP(nn.Module):
+        """ 
+        Random Fourier Features + MLP tanh
+        """
+        @nn.compact 
+        def __call__(self, x):
+            #fixed fourier features 
+            B = self.param('B', lambda rng, shape: jax.random.normal(rng, shape) * sigma,  (2, n_freqs))
+            proj = x @ B # (N, n_freqs)
+            x = jnp.concatenate([jnp.sin(proj), jnp.cos(proj)], axis=-1) # (N, 2*n_freqs)
+            #classic MLP
+            for _ in range(n_layers):
+                x = nn.Dense(hidden)(x)
+                x = nn.tanh(x)
+            return nn.Dense(1)(x)
+    return FourierMLP
         
-        x = nn.Dense(self.features[0])(x)
-        x = jnp.sin(self.omega_0 * x)
-        for feat in self.features[1:]:
-            x = nn.Dense(feat)(x)
-            x =jnp.sin(x)
-        x = nn.Dense(1)(x)
-        return x 
-    
-class FourierMLP(nn.Module):
-    """ 
-    Random FOurier Features + MLP tanh
-    """
-    n_freqs: int = 16 #number of random frequencies
-    hidden: int = 64
-    n_layers: int = 3
-    sigma: float = 10.0 #scale of the random frequencies
-    
-    @nn.compact 
-    def __call__(self, x):
-        #fixed fourier features 
-        B = self.param('B', lambda rng, shape: jax.random.normal(rng, shape) * self.sigma,  (2, self.n_freqs))
-        proj = x @ B # (N, n_freqs)
-        x = jnp.concatenate([jnp.sin(proj), jnp.cos(proj)], axis=-1) # (N, 2*n_freqs)
-        #classic MLP
-        for _ in range(self.n_layers):
-            x = nn.Dense(self.hidden)(x)
-            x = nn.tanh(x)
-        return nn.Dense(1)(x)
-    
+#INR class registry 
 INR_REGISTRY = {
-    "mlp_16": MLP_16,
-    "mlp_64": MLP_64,
-    "mlp_128": MLP_128,
-    "deep_128": Deep_128,
-    "siren": SIREN,
-    "siren_128": SIREN_128,
-    "fourier_mlp": FourierMLP,
+    "mlp_16": make_mlp(16, 3),
+    "mlp_64": make_mlp(64, 3),
+    "mlp_128": make_mlp(128, 3),
+    "deep_128": make_mlp(128, 5),
+    "siren": make_siren((64, 64, 64), 30.0),
+    "siren_128": make_siren((128, 128, 128), 30.0),
+    "siren_deep_128": make_siren((128, 128, 128, 128, 128), 30.0),
+    "fourier_mlp": make_fourier_mlp(16, 64, 3, 10.0),
+    "fourier_mlp_128": make_fourier_mlp(16, 128, 3, 10.0),
+    "fourier_mlp_deep_128": make_fourier_mlp(16, 128, 5, 10.0),
 }   
 
 def get_inr_model(arch: str) -> nn.Module:
