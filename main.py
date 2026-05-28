@@ -1,4 +1,6 @@
-"""Entry point: run from the `python/` directory (or after `pip install -e .`)."""
+"""Entry point: run from the `python/` directory
+(or after `pip install -e .`).
+"""
 
 import argparse
 from pathlib import Path
@@ -9,14 +11,16 @@ from src.adjoint_method import optimize
 from src.convergence import plot_errors
 
 # Default YAML next to project root `python/`, sibling of `src/` and `params/`.
-_DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "params" / "landau_damping.yaml"
+_ROOT_DIR = Path(__file__).resolve().parent
+_DEFAULT_CONFIG = _ROOT_DIR / "params" / "landau_damping.yaml"
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Vlasov–Poisson driver (predcorr / NuFI stub).")
+    parser = argparse.ArgumentParser(
+        description="Vlasov–Poisson driver (predcorr / NuFI stub).")
     parser.add_argument(
-        "task", 
-        choices=["sim", "opt", "err"], 
+        "task",
+        choices=["sim", "opt", "err"],
         help="La partie du programme à exécuter"
     )
     parser.add_argument(
@@ -36,6 +40,7 @@ def main():
         optimize(cfg)
     elif args.task == "err":
         plot_errors(cfg)
+
 
 if __name__ == "__main__":
     main()
