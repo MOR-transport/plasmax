@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Any
 from functools import partial 
+jax.config.update("jax_enable_x64", True)
 
 # POD
 def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path, data_dir: Path) -> jnp.ndarray:
@@ -65,7 +66,6 @@ def make_mlp(hidden_size: int, n_layers: int = 3):
             return nn.Dense(1)(x)
     return MLP
 
-
 def make_siren(features: tuple, omega_0: float):
     class SIREN(nn.Module):
         @nn.compact 
@@ -95,32 +95,117 @@ def make_fourier_mlp(n_freqs: int, hidden: int, n_layers: int, sigma: float):
                 x = nn.Dense(hidden)(x)
                 x = nn.tanh(x)
             return nn.Dense(1)(x)
-    return FourierMLP
-        
-#INR class registry 
-INR_REGISTRY = {
-    "mlp_16": make_mlp(16, 3),
-    "mlp_64": make_mlp(64, 3),
-    "mlp_128": make_mlp(128, 3),
-    "deep_128": make_mlp(128, 5),
-    "siren": make_siren((64, 64, 64), 30.0),
-    "siren_128": make_siren((128, 128, 128), 30.0),
-    "siren_deep_128": make_siren((128, 128, 128, 128, 128), 30.0),
-    "fourier_mlp": make_fourier_mlp(16, 64, 3, 10.0),
-    "fourier_mlp_128": make_fourier_mlp(16, 128, 3, 10.0),
-    "fourier_mlp_deep_128": make_fourier_mlp(16, 128, 5, 10.0),
-}   
+    return FourierMLP   
 
-def get_inr_model(arch: str) -> nn.Module:
-    if arch not in INR_REGISTRY:
+def make_periodic_mlp(hidden_size: int, n_layers: int):
+    class PeriodicMLP(nn.Module):
+        @nn.compact 
+        def __call__(self, x_inputs):
+            #x_inputs is of shape (N, 2) with (x, v) 
+            x_coord = x_inputs[:, 0:1] # (N, 1) : only x 
+            v_coord = x_inputs[:, 1:2] # (N, 1) : only v
+            
+            #periodic embedding of x
+            kx = 2.0 * jnp.pi #no division by lx because x is already divided by lx for normalization
+            x_embedded = jnp.concatenate([
+                jnp.cos(kx * x_coord),
+                jnp.sin(kx * x_coord)
+            ], axis=-1)
+            
+            #concatenate with v
+            h = jnp.concatenate([x_embedded, v_coord], axis=-1)
+            
+            #classic MLP
+            for _ in range(n_layers):
+                h = nn.Dense(hidden_size)(h)
+                h = nn.tanh(h)
+            return nn.Dense(1)(h)
+    return PeriodicMLP
+
+def make_periodic_siren(features: tuple, omega_0: float):
+    class PeriodicSIREN(nn.Module):
+        @nn.compact 
+        def __call__(self, x_inputs):
+            x_coord = x_inputs[:, 0:1]
+            v_coord = x_inputs[:, 1:2]
+            
+            #periodic embedding of x
+            kx = 2.0 * jnp.pi
+            x_embedded = jnp.concatenate([
+                jnp.cos(kx * x_coord),
+                jnp.sin(kx * x_coord)
+            ], axis=-1)
+            
+            h = jnp.concatenate([x_embedded, v_coord], axis=-1)
+            
+            #classic SIREN
+            h = nn.Dense(features[0])(h)
+            h = jnp.sin(omega_0 * h)
+            for feat in features[1:]:
+                h = nn.Dense(feat)(h)
+                h = jnp.sin(h)
+            return nn.Dense(1)(h)
+    return PeriodicSIREN
+
+def make_periodic_fourier_mlp(n_freqs: int, hidden: int, n_layers: int, sigma: float):
+    class PeriodicFourierMLP(nn.Module):
+        @nn.compact 
+        def __call__(self, x_inputs):
+            x_coord = x_inputs[:, 0:1]
+            v_coord = x_inputs[:, 1:2]
+            
+            kx = 2.0 * jnp.pi
+            x_embedded = jnp.concatenate([
+                jnp.cos(kx * x_coord),
+                jnp.sin(kx * x_coord)
+            ], axis=-1)
+            
+            h = jnp.concatenate([x_embedded, v_coord], axis=-1)
+            
+            #the matrix B must now project 3 features (cos_x, sin_x, v) to n_freqs instead of 2
+            B = self.param('B', lambda rng, shape: jax.random.normal(rng, shape) * sigma, (3, n_freqs))
+            proj = h @ B # (N, n_freqs)
+            
+            h = jnp.concatenate([jnp.sin(proj), jnp.cos(proj)], axis=-1) # (N, 2*n_freqs)
+            
+            for _ in range(n_layers):
+                h = nn.Dense(hidden)(h)
+                h = nn.tanh(h)
+            return nn.Dense(1)(h)
+    return PeriodicFourierMLP
+            
+            
+def get_inr_registry():
+    return {
+        "mlp_16": make_mlp(16, 3),
+        "mlp_64": make_mlp(64, 3),
+        "mlp_128": make_mlp(128, 3),
+        "deep_128": make_mlp(128, 5),
+        "siren": make_siren((64, 64, 64), 30.0),
+        "siren_128": make_siren((128, 128, 128), 30.0),
+        "siren_deep_128": make_siren((128, 128, 128, 128, 128), 30.0),
+        "fourier_mlp": make_fourier_mlp(16, 64, 3, 10.0),
+        "fourier_mlp_128": make_fourier_mlp(16, 128, 3, 10.0),
+        "fourier_mlp_deep_128": make_fourier_mlp(16, 128, 5, 10.0),
+        "periodic_mlp_16": make_periodic_mlp(16, 3),
+        "periodic_mlp_64": make_periodic_mlp(64, 3),
+        "periodic_siren": make_periodic_siren((64, 64, 64), 30.0),
+        "periodic_siren_128": make_periodic_siren((128, 128, 128), 30.0),
+        "periodic_fourier_mlp": make_periodic_fourier_mlp(16, 64, 3, 10.0),
+    }
+
+#list for argparse choices
+AVAILABLE_INR_ARCHS = list(get_inr_registry().keys()) 
+
+def get_inr_model(arch:str) -> nn.Module:
+    registry = get_inr_registry()
+    if arch not in registry: 
         raise ValueError(
-            f"Architecture INR inconnue : '{arch}'."
-            f"Choix disponibles : {list(INR_REGISTRY.keys())}"
+            f"Unknown INR Architecture : '{arch}'.\n"
+            f"Available choices : {list(registry.keys())}"
         )
-    return INR_REGISTRY[arch]()
-    
-        
-    
+    return registry[arch]()
+
 def mse_loss(params, model, inputs, targets):
     predictions = model.apply(params, inputs)
     
@@ -148,9 +233,11 @@ def compress_inr(
     f_full: jnp.ndarray, 
     grid_X: jnp.ndarray, 
     grid_V: jnp.ndarray, 
+    lx: float,
+    lv: float,
     current_time: float,
     data_dir: Path,
-    arch: str = "mlp_16",
+    arch: str = "periodic_mlp_64",
     params_init: Any = None, 
     lr: float = 1e-3, 
     max_iters: int = 2000, 
@@ -159,13 +246,15 @@ def compress_inr(
     """
     Fit an INR network to approximate f_full.
     """
-    #Normalizing entries in [-1, 1]
-    x_norm = grid_X / grid_X.max()
-    v_norm = grid_V / jnp.abs(grid_V).max() 
-    inputs = jnp.stack([x_norm.flatten(), v_norm.flatten()], axis=-1) 
+    #kx = 2.0 * jnp.pi / lx #dynamic calculation of kx for periodic embedding
+    x_raw = grid_X.flatten() / lx #normalization of x to [0, 1]
+    v_norm = grid_V.flatten() / lv #normalization of v to [-1, 1]
+    
+    inputs = jnp.stack([x_raw, v_norm], axis=-1) # (N, 2)
     targets = f_full.flatten()[:, None]
     
     total_points = inputs.shape[0]
+    
     model = get_inr_model(arch)
     optimizer = optax.adam(learning_rate=lr)
     
@@ -173,7 +262,8 @@ def compress_inr(
     if params_init is None:
         key, subkey = jax.random.split(key)
         params = model.init(subkey, inputs[:1, :])
-    else: params = params_init
+    else: 
+        params = params_init
     
     opt_state = optimizer.init(params)
     loss = jnp.inf 

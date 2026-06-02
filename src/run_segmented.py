@@ -5,14 +5,14 @@ from .sim import run_time_loop
 import jax.numpy as jnp
 
 import pickle 
-from .compression import compress_inr, compress_pod, INR_REGISTRY
+from .compression import compress_inr, compress_pod, AVAILABLE_INR_ARCHS
 def main():
     parser = argparse.ArgumentParser(description="Run PlasmaX simulation in segments.")
     parser.add_argument("--params", type=str, required=True, help="Base yaml config file")
     parser.add_argument("--tend", type=float, default=None, help="Total simulation time")
     parser.add_argument("--rank", type=int, default=32, help="Rank for POD compression")
     parser.add_argument("--compression", type=str, choices=["POD", "INR", "NONE"], default=None, help="Override yaml compression method")
-    parser.add_argument("--arch", type=str, default="mlp_16", choices=list(INR_REGISTRY.keys()), help="INR architecture (if compression method is INR)")
+    parser.add_argument("--arch", type=str, default="periodic_mlp_64", choices=AVAILABLE_INR_ARCHS, help="INR architecture (if compression method is INR)")
     args = parser.parse_args()
     
     #base configuration
@@ -85,6 +85,8 @@ def main():
                 f_full=f_full,
                 grid_X=cfg.grid.X,
                 grid_V=cfg.grid.V,
+                lx=cfg.grid.lx,
+                lv=cfg.grid.lv,
                 current_time=current_time,
                 data_dir=cfg.paths.data_dir,
                 arch=args.arch,

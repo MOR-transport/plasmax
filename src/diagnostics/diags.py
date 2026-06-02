@@ -102,6 +102,9 @@ INR_ARCH_STYLES: dict[str, dict] = {
     "fourier_mlp": {"color": "#089266", "linestyle": "-",   "marker": "P", "label": "Fourier MLP 64×3"},
     "fourier_mlp_128": {"color": "#2CD237", "linestyle": "-.",   "marker": "P", "label": "Fourier MLP 128×3"},
     "fourier_mlp_deep_128": {"color": "#26FF00", "linestyle": "-",   "marker": "P", "label": "Fourier MLP DEEP 128×5"},
+    
+    "periodic_mlp_16": {"color": "#089266", "linestyle": "-",   "marker": "P", "label": "PERIODIC MLP 64×3"},
+    "periodic_siren": {"color": "#2CD237", "linestyle": "-.",   "marker": "P", "label": "PERIODIC SIREN 64×3"},
 }
 
 def arch_style(arch: str) -> dict:
@@ -145,7 +148,7 @@ def plot_frob_errors(cases_data: list[dict], figure_dir: Path,fmt: str, show_inr
     """ 
     Generate frobenius error plot
     """
-    fig, ax = plt.subplots(figsize=(9, 6))
+    fig, ax = plt.subplots(figsize=(17, 10))
     plotted_any = False
 
     #POD
@@ -220,7 +223,7 @@ def plot_frob_errors(cases_data: list[dict], figure_dir: Path,fmt: str, show_inr
         title = "POD Truncation Error"
     ax.set_title(title, fontsize=15, pad=14)
 
-    ax.legend(loc="best", fontsize=11, frameon=True, edgecolor="#cbd5e1", framealpha=0.9)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=11, frameon=True, edgecolor="#cbd5e1", framealpha=0.9)
     ax.grid(True, which="major", linestyle="-",  alpha=0.4)
     ax.grid(True, which="minor", linestyle=":",  alpha=0.15)
     fig.tight_layout()
@@ -243,7 +246,7 @@ def plot_inr_loss_curves(cases_data: list[dict], figure_dir: Path,fmt: str):
     Final loss per segment for each INR architecture for diagnosing convergence indepenently of physical error
     """    
     inr_loss_path_found = False 
-    fig, ax = plt.subplots(figsize=(9, 5))
+    fig, ax = plt.subplots(figsize=(17, 10))
     
     for case in cases_data:
         inr_path = case["csv_path"].parent / "inr_errors.csv"
@@ -287,7 +290,7 @@ def plot_inr_loss_curves(cases_data: list[dict], figure_dir: Path,fmt: str):
     ax.set_xlabel("Time", fontsize=14, labelpad=10)
     ax.set_ylabel("Final loss (MSE)", fontsize=14, labelpad=10)
     ax.set_title("INR convergence per segment - Comparison of architectures", fontsize=15, pad=14)
-    ax.legend(loc="best", fontsize=11, frameon=True, edgecolor="#cbd5e1", framealpha=0.9)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=11, frameon=True, edgecolor="#cbd5e1", framealpha=0.9)
     ax.grid(True, which="major", linestyle="-", alpha=0.4)
     ax.grid(True, which="minor", linestyle=":", alpha=0.15)
     fig.tight_layout()
@@ -402,7 +405,7 @@ def main():
     #physical curves
     for quantity in quantities:
         csv_key = name_mapping[quantity]
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=(17, 10))
 
         for case in cases_data:
             if csv_key not in case["data"]:
@@ -419,7 +422,7 @@ def main():
         ax.set_xlabel("Time", fontsize=12)
         ax.set_ylabel(quantity.upper(), fontsize=14, labelpad=10)
         ax.set_title(f"{quantity.upper()} over Time", fontsize=16, pad=15)
-        ax.legend(loc="best", fontsize=12, frameon=True, edgecolor='black')
+        ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=12, frameon=True, edgecolor='black')
         ax.grid(True, which='major', linestyle='-', alpha=0.5)
         ax.grid(True, which='minor', linestyle=':', alpha=0.2)
         fig.tight_layout()
