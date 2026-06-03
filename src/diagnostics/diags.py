@@ -92,19 +92,32 @@ def save_figure(fig: plt.Figure, output_path: Path, fmt: str = "both"):
 
 #Palette fixe par architecture INR 
 INR_ARCH_STYLES: dict[str, dict] = {
-    "mlp_16": {"color": "#888787", "linestyle": "--",  "marker": "s", "label": "MLP 16×3"},
-    "mlp_64":      {"color": "#4C9BE8", "linestyle": "-",   "marker": "o", "label": "MLP 64×3"},
-    "mlp_128":     {"color": "#2563EB", "linestyle": "-",   "marker": "D", "label": "MLP 128×3"},
-    "deep_128":    {"color": "#7C3AED", "linestyle": "-.",  "marker": "^", "label": "MLP DEEP 128×5"},
-    "siren":       {"color": "#E85D04", "linestyle": "-",   "marker": "*", "label": "SIREN 64×3"},
-    "siren_128":   {"color": "#F59E0B", "linestyle": "-.",  "marker": "v", "label": "SIREN 128×3"},
-    "siren_deep_128": {"color": "#FFFB0B", "linestyle": "-",  "marker": "X", "label": "SIREN DEEP 128×5"},
-    "fourier_mlp": {"color": "#089266", "linestyle": "-",   "marker": "P", "label": "Fourier MLP 64×3"},
-    "fourier_mlp_128": {"color": "#2CD237", "linestyle": "-.",   "marker": "P", "label": "Fourier MLP 128×3"},
-    "fourier_mlp_deep_128": {"color": "#26FF00", "linestyle": "-",   "marker": "P", "label": "Fourier MLP DEEP 128×5"},
-    
-    "periodic_mlp_16": {"color": "#089266", "linestyle": "-",   "marker": "P", "label": "PERIODIC MLP 64×3"},
-    "periodic_siren": {"color": "#2CD237", "linestyle": "-.",   "marker": "P", "label": "PERIODIC SIREN 64×3"},
+    # mlp
+    "mlp_16": {"color": "#89CFF0", "linestyle": "--", "marker": "s", "label": "MLP 16×3"},
+    "mlp_64": {"color": "#4A90E2", "linestyle": "-",  "marker": "o", "label": "MLP 64×3"},
+    "mlp_128": {"color": "#1E3A8A", "linestyle": "-",  "marker": "D", "label": "MLP 128×3"},
+    "deep_128": {"color": "#0F2B5C", "linestyle": "-.", "marker": "^", "label": "MLP DEEP 128×5"},
+    # siren
+    "siren": {"color": "#F4A261", "linestyle": "-",   "marker": "*", "label": "SIREN 64×3"},
+    "siren_128": {"color": "#E76F51", "linestyle": "-.", "marker": "v", "label": "SIREN 128×3"},
+    "siren_deep_128": {"color": "#C1121F", "linestyle": "-",   "marker": "X", "label": "SIREN DEEP 128×5"},
+    # fourier mlp
+    "fourier_mlp": {"color": "#2A9D8F", "linestyle": "-",   "marker": "P", "label": "Fourier MLP 64×3"},
+    "fourier_mlp_128": {"color": "#1B6B5E", "linestyle": "-.", "marker": "P", "label": "Fourier MLP 128×3"},
+    "fourier_mlp_deep_128": {"color": "#0D3B33", "linestyle": "-",   "marker": "P", "label": "Fourier MLP DEEP 128×5"},
+    # ----- periodic versions (same colors as non‑periodic) -----
+    # mlp
+    "periodic_mlp_16": {"color": "#89CFF0", "linestyle": ":", "marker": "s", "label": "Periodic MLP 16×3"},
+    "periodic_mlp_64": {"color": "#4A90E2", "linestyle": ":", "marker": "o", "label": "Periodic MLP 64×3"},
+    "periodic_mlp_128": {"color": "#1E3A8A", "linestyle": ":", "marker": "D", "label": "Periodic MLP 128×3"},
+    #siren
+    "periodic_siren": {"color": "#F4A261", "linestyle": ":", "marker": "*", "label": "Periodic SIREN 64×3"},
+    "periodic_siren_128": {"color": "#E76F51", "linestyle": ":", "marker": "v", "label": "Periodic SIREN 128×3"},
+    "periodic_siren_deep_128": {"color": "#C1121F", "linestyle": ":", "marker": "X", "label": "Periodic SIREN DEEP 128×5"},
+    #fourier mlp
+    "periodic_fourier_mlp": {"color": "#2A9D8F", "linestyle": ":", "marker": "P", "label": "Periodic Fourier MLP 64×3"},
+    "periodic_fourier_mlp_128": {"color": "#1B6B5E", "linestyle": ":", "marker": "P", "label": "Periodic Fourier MLP 128×3"},
+    "periodic_fourier_mlp_deep_128": {"color": "#0D3B33", "linestyle": ":", "marker": "P", "label": "Periodic Fourier MLP DEEP 128×5"},
 }
 
 def arch_style(arch: str) -> dict:

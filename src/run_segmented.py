@@ -3,9 +3,12 @@ from pathlib import Path
 from .config import load_config, Paths 
 from .sim import run_time_loop 
 import jax.numpy as jnp
+import numpy as np
 
 import pickle 
 from .compression import compress_inr, compress_pod, AVAILABLE_INR_ARCHS
+from .plotting import plot_inr_benchmark_comparison, plot_loss_history
+
 def main():
     parser = argparse.ArgumentParser(description="Run PlasmaX simulation in segments.")
     parser.add_argument("--params", type=str, required=True, help="Base yaml config file")
@@ -81,7 +84,7 @@ def main():
             
         elif compression == "INR":
             print(f"\n[INR] Applying Neural Network compression...")
-            f_comp, current_nn_params = compress_inr(
+            f_comp, current_nn_params, loss_history = compress_inr(
                 f_full=f_full,
                 grid_X=cfg.grid.X,
                 grid_V=cfg.grid.V,
@@ -92,6 +95,31 @@ def main():
                 arch=args.arch,
                 params_init=current_nn_params
             )
+            
+            #benchmark architectures
+            benchmark_times = np.arange(dt_seg, final_time + (dt_seg/2), dt_seg) # [5, ..., 30]. + dt_seg/2 to avoid numerical issues with floating point comparisons
+            
+            if any(np.isclose(current_time, bt, atol=1e-3) for bt in benchmark_times):
+                print(f"-> Benchmark recording for t={current_time}...")
+                bench_dir = case_root / "comparisons" / "INR_benchmark" / args.arch
+                bench_dir.mkdir(parents=True, exist_ok=True)
+                
+                plot_inr_benchmark_comparison(
+                    f_sim = f_full,
+                    f_net = f_comp,
+                    grid_X = cfg.grid.X,
+                    grid_V = cfg.grid.V,
+                    t = current_time,
+                    arch_name = args.arch,
+                    save_dir = bench_dir
+                )
+                
+                plot_loss_history(
+                    loss_history=loss_history,
+                    t=current_time,
+                    arch_name=args.arch,
+                    save_dir=bench_dir
+                )
             
             jnp.savez(file_path, f=f_comp, t=t_saved, it=it_saved)
             weights_path = cfg.paths.data_dir / f"nn_weights_t{current_time:05.2f}.pkl"

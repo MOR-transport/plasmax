@@ -177,21 +177,31 @@ def make_periodic_fourier_mlp(n_freqs: int, hidden: int, n_layers: int, sigma: f
             
 def get_inr_registry():
     return {
+        #mlp
         "mlp_16": make_mlp(16, 3),
         "mlp_64": make_mlp(64, 3),
         "mlp_128": make_mlp(128, 3),
         "deep_128": make_mlp(128, 5),
+        #siren
         "siren": make_siren((64, 64, 64), 30.0),
         "siren_128": make_siren((128, 128, 128), 30.0),
         "siren_deep_128": make_siren((128, 128, 128, 128, 128), 30.0),
+        #fourier mlp
         "fourier_mlp": make_fourier_mlp(16, 64, 3, 10.0),
         "fourier_mlp_128": make_fourier_mlp(16, 128, 3, 10.0),
         "fourier_mlp_deep_128": make_fourier_mlp(16, 128, 5, 10.0),
+        #periodic versions
+        #periodic mlp
         "periodic_mlp_16": make_periodic_mlp(16, 3),
         "periodic_mlp_64": make_periodic_mlp(64, 3),
+        #periodic siren
         "periodic_siren": make_periodic_siren((64, 64, 64), 30.0),
         "periodic_siren_128": make_periodic_siren((128, 128, 128), 30.0),
+        "periodic_siren_deep_128": make_periodic_siren((128, 128, 128, 128, 128), 30.0),
+        #periodic fourier mlp
         "periodic_fourier_mlp": make_periodic_fourier_mlp(16, 64, 3, 10.0),
+        "periodic_fourier_mlp_128": make_periodic_fourier_mlp(16, 128, 3, 10.0),
+        "periodic_fourier_mlp_deep_128": make_periodic_fourier_mlp(16, 128, 5, 10.0)
     }
 
 #list for argparse choices
@@ -268,6 +278,8 @@ def compress_inr(
     opt_state = optimizer.init(params)
     loss = jnp.inf 
     
+    loss_history = []
+    
     #training loop 
     for i in range(max_iters):
         #generate a new key for the random draw in this iteration
@@ -278,7 +290,7 @@ def compress_inr(
         params, opt_state, loss = train_step(
             params, opt_state, model, optimizer, inputs[batch_idx], targets[batch_idx]
         )
-                
+        loss_history.append(float(loss))
         #check of treshold every 100 iterations
         if i % 100 == 0:
             print(f"  [INR/{arch}] iter {i:4d} — loss: {loss:.2e}")
@@ -296,5 +308,4 @@ def compress_inr(
     
     log_inr_error(data_dir, arch, current_time, float(loss), frob_error)
     
-    return f_comp, params
-    
+    return f_comp, params, jnp.array(loss_history)
