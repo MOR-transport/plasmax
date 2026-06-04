@@ -2,12 +2,16 @@ import argparse
 from pathlib import Path 
 from .config import load_config, Paths 
 from .sim import run_time_loop 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
 import pickle 
 from .compression import compress_inr, compress_pod, AVAILABLE_INR_ARCHS
 from .plotting import plot_inr_benchmark_comparison, plot_loss_history
+
+jax.config.update("jax_enable_x64", True)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Run PlasmaX simulation in segments.")
