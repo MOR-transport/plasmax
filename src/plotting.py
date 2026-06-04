@@ -79,13 +79,10 @@ def plot_profile(cfg, f_hist: jnp.ndarray, format="png", nb_profiles=3) -> None:
     axs[0].legend()
     axs[1].legend()
 
-    folder = Path("plots/simulation/sim_default")
-    if not folder.exists():
-        raise FileNotFoundError("Error : simulation folder doesn't exists")
     if format == "png":
-        fig.savefig(folder / "profile.png")
+        fig.savefig(str(cfg.paths.plot_dir / f"profile.{format}"))
     elif format == "tex":
-        save(folder / "profile.tex", encoding="utf-8")
+        save(str(cfg.paths.plot_dir / f"profile.{format}"), encoding="utf-8")
     plt.close(fig)
 
 
@@ -102,11 +99,10 @@ def plot_energy(cfg, Efield_hist, format="png"):
     ax.set_ylabel(r"$E_\text{pot}$")
     ax.set_title("Potential energy")
 
-    folder = Path("plots/simulation/sim_default")
     if format == "png":
-        fig.savefig(folder / "energy.png")
+        fig.savefig(str(cfg.paths.plot_dir / f"energy.{format}"))
     elif format == "tex":
-        save(folder / "energy.tex", encoding="utf-8")
+        save(str(cfg.paths.plot_dir / f"energy.{format}"), encoding="utf-8")
     plt.close(fig)
 
 
@@ -230,11 +226,43 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
 
     axs[1][1].set_xlabel(r"$x$")
     axs[1][1].set_ylabel(r"$v$")
-    axs[1][1].set_title(r"Function $f$")
+    axs[1][1].set_title(r"Function $f$ at final time")
 
     axs[1][2].set_xlabel(r"$x$")
     axs[1][2].set_ylabel(r"$v$")
-    axs[1][2].set_title(r"Function $f^{exp}$")
+    axs[1][2].set_title(r"Function $f^{exp}$ at final time")
+
+    fig.tight_layout()
+
+    if fname is not None:
+        if str(fname)[-3:] == "png":
+            fig.savefig(fname)
+        elif str(fname)[-3:] == "tex":
+            save(fname, encoding="utf-8")
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def plot_grad_info(cfg, inicond, adj_grad, fname):
+    fig, axs = plt.subplots(1, 3, figsize=(40, 15))
+
+    axs[0].plot(cfg.grid.x, inicond[cfg.grid.nv // 2, :], label="Initial condition")
+    axs[0].plot(cfg.grid.x, adj_grad[cfg.grid.nv // 2, :], label="Gradient")
+    axs[0].legend()
+    axs[0].set_title(f"Comparison of initial condition and gradient at v = {-cfg.grid.lv + cfg.grid.dv * (cfg.grid.nv // 2):.2f}")
+    axs[0].set_xlabel(r"$x$")
+
+    axs[1].plot(cfg.grid.v, inicond[:, cfg.grid.nx // 2], label="Initial condition")
+    axs[1].plot(cfg.grid.v, adj_grad[:, cfg.grid.nx // 2], label="Gradient")
+    axs[1].legend()
+    axs[1].set_title(f"Comparison of initial condition and gradient at x = {cfg.grid.dx * (cfg.grid.nx // 2):.2f}")
+    axs[1].set_xlabel(r"$v$")
+
+    pcm_grad = axs[2].pcolormesh(cfg.grid.X, cfg.grid.V, adj_grad, shading="auto", cmap='turbo')
+    fig.colorbar(pcm_grad, ax=axs[2])
+    axs[2].set_xlabel(r"$x$")
+    axs[2].set_ylabel(r"$v$")
 
     fig.tight_layout()
 

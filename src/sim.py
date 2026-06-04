@@ -76,20 +76,6 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
     rho = compute_density(f, grid.dv)
     Efield = vpoisson(rho, grid, cfg.physics.charge)
 
-    if cfg.time.plot_freq > 0:
-        folder = Path("plots/simulation/sim_default")
-        folder_f = folder / "iterations/solution"
-        folder_E = folder / "iterations/Efield"
-
-        if folder.exists() and folder.is_dir():
-            shutil.rmtree(folder)
-
-        folder_f.mkdir(parents=True)
-        folder_E.mkdir(parents=True)
-
-        plot_inicond(cfg, f, folder_f / f"solution_{0:04d}.{format}")
-        plot_Efield(cfg, Efield, t, folder_E / f"Efield_{0:04d}.{format}")
-
     # Number of iterations from the initial time
     remaining = max(0.0, cfg.time.tend - t)
     nt_cap = min(cfg.time.nt_max, int(math.ceil(remaining / cfg.time.dt)))
@@ -99,10 +85,11 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
 
     tcpu = []
 
-    if nb_profile > 0:
-        fig, axs = plt.subplots(2, 1, figsize=(16, 10))
-
     cfg.paths.plot_dir.mkdir(parents=True, exist_ok=True)
+
+    if cfg.time.plot_freq > 0:
+        plot_inicond(cfg, f, str(cfg.paths.plot_dir / f"solution_{0:04d}.{format}"))
+        plot_Efield(cfg, Efield, t, str(cfg.paths.plot_dir / f"Efield_{0:04d}.{format}"))
 
     f_hist = jnp.empty((nt_cap+1, grid.nv, grid.nx), dtype=jnp.float64)
     f_hist = f_hist.at[0, :, :].set(f)
@@ -134,9 +121,6 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
                           str(cfg.paths.plot_dir / f"solution_{it:04d}.{format}"))
             plot_Efield(cfg, Efield, t,
                         str(cfg.paths.plot_dir / f"Efield_{it:04d}.{format}"))
-        if nb_profile > 0:
-            if cfg.time.plot_freq > 0 and it % ((nt_cap-2) // nb_profile) == 0:
-                plot_profile(cfg, f, t, axs)
         if t >= cfg.time.tend - 1e-15:
             break
     else:
@@ -150,11 +134,6 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
             f"Average step time: {total / max(len(tcpu), 1):.4f} s",
             flush=True,
         )
-
-    if nb_profile > 0:
-        axs[0].legend()
-        axs[1].legend()
-        fig.savefig(cfg.paths.plot_dir / "profile.png")
 
     # Save final distribution function and time to an .npz archive
     save_path = cfg.paths.data_dir / "f_final.npz"

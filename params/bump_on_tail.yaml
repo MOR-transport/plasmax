@@ -2,7 +2,6 @@ method: predcorr # or nufi (not implemented in Python yet)
 physics:
   charge: -1.0
   mass: 1.0
-  knudsen: 1.0
 interp:
   order: 3
 grid:
