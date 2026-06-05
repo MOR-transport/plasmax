@@ -159,6 +159,7 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
             plot_grad_info(cfg, inicond_prec, -adj_hist[0, :, :], folder_it / f"grad_{it:04d}.{format}")
         else:
             inicond += cfg.optim.lr * adj_hist[0, :, :]
+            iniconds.append(inicond.copy())
             f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond, verbose=False)
             plot_optimisation(cfg, residuals, grads, stepsize, inicond, f_hist,
                               f_exp, folder_it / f"opt_{it:04d}.{format}")
