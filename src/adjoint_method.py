@@ -11,7 +11,7 @@ from .config import load_config
 from .inicond import get_inicond, get_inicond_exp
 from .sim import run_time_loop
 from .advect import advect_with_source_hist
-from .plotting import make_anim_2d, plot_optimisation, plot_grad_info
+from .plotting import make_anim_2d, plot_optimisation, plot_grad_info, compare_auto_grad, plot_opt_source
 from .source import get_filters_exp, compute_src
 
 jax.config.update("jax_enable_x64", True)
@@ -110,20 +110,31 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
     iniconds = [inicond.copy()]
     gradients = []
 
+    def func_to_minimize(inicond):
+        f, _ = run_time_loop(cfg, inicond=inicond, auto_grad=True, verbose=False)
+        return functionnal(cfg, f, f_exp)
+
     folder = Path("optimization/default_optim/")
     folder_it = folder / "iterations"
+    folder_step = folder_it / "step"
+    folder_grad = folder_it / "grad"
+    folder_opt_src = folder_it / "opt_src"
+    folder_auto_grad = folder_it / "comp_auto_grad"
 
     if folder.exists() and folder.is_dir():
         print("WARNING: Erasing existing optimization/default_optim/ folder!")
         shutil.rmtree(folder)
 
-    folder_it.mkdir(parents=True)
+    folder_step.mkdir(parents=True)
+    folder_grad.mkdir(parents=True)
+    folder_opt_src.mkdir(parents=True)
+    folder_auto_grad.mkdir(parents=True)
 
     print("\n# ========== Start running the simulation framework ========== %")
 
     f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond, verbose=False)
     plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp,
-                      folder_it / f"opt_{0:04d}.png")
+                      folder_step / f"opt_{0:04d}.png")
 
     for it in range(1, cfg.optim.Nopt+1):
         print(f"##### Iteration {it:3d} #####")
@@ -145,6 +156,8 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
         #     cfg.optim.Nopt = it + 1
         #    break
 
+        auto_grad = jax.grad(func_to_minimize)(inicond) / ( cfg.grid.dx * cfg.grid.dv )
+
         if line_search_opt:
             inicond_prec = inicond.copy()
             inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(),
@@ -155,8 +168,10 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
             stepsize = alpha
             iniconds.append(inicond.copy())
             plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist,
-                              f_exp, folder_it / f"opt_{it:04d}.{format}")
-            plot_grad_info(cfg, inicond_prec, -adj_hist[0, :, :], folder_it / f"grad_{it:04d}.{format}")
+                              f_exp, folder_step / f"opt_{it:04d}.{format}")
+            plot_grad_info(cfg, inicond_prec, -adj_hist[0, :, :], folder_grad / f"grad_{it:04d}.{format}")
+            plot_opt_source(cfg, src, folder_opt_src / f"opt_src_{it:04d}.{format}")
+            compare_auto_grad(cfg, -adj_hist[0, :, :], auto_grad, folder_auto_grad / f"auto_grad_{it:04d}.{format}")
         else:
             inicond += cfg.optim.lr * adj_hist[0, :, :]
             iniconds.append(inicond.copy())

@@ -39,13 +39,13 @@ def step(f: jnp.ndarray, cfg, t: float, src=None) -> tuple[jnp.ndarray, jnp.ndar
                              "(expected predcorr or nufi).")
 
 
-def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
+def run_time_loop(cfg, src=None, inicond=None, auto_grad=False, format="png", nb_profile=0,
                   verbose=True) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     """Advance ``f`` until ``time >= cfg.time.tend`` or ``nt_max`` steps."""
     grid = cfg.grid
 
     # f and t initialization
-    if cfg.io.restart.enabled and cfg.io.restart.file:
+    if cfg.io.restart.enabled and cfg.io.restart.file and not auto_grad:
         restart_path = Path(cfg.io.restart.file)
         if not restart_path.exists():
             raise FileNotFoundError(f"Restart file '{restart_path}' not found.")
@@ -98,7 +98,7 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
     Efield_hist = Efield_hist.at[0, :].set(Efield)
 
     global_it = it_offset
-    if global_it == 0:
+    if global_it == 0 and not auto_grad:
         measure(cfg, f, Efield, global_it, t)
     for it in range(1, nt_cap + 1):
 
@@ -111,7 +111,8 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
         f_hist = f_hist.at[it, :, :].set(f)
         Efield_hist = Efield_hist.at[it, :].set(Efield)
 
-        measure(cfg, f, Efield, global_it, t)
+        if not auto_grad:
+            measure(cfg, f, Efield, global_it, t)
 
         if verbose:
             print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.2f}, "
@@ -135,11 +136,12 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
             flush=True,
         )
 
-    # Save final distribution function and time to an .npz archive
-    save_path = cfg.paths.data_dir / "f_final.npz"
-    save_path.parent.mkdir(parents=True, exist_ok=True)
-    jnp.savez(save_path, f=f, t=t, it=global_it)
-    print(f"Save state (f,t,it) to {save_path}")
+    if not auto_grad:
+        # Save final distribution function and time to an .npz archive
+        save_path = cfg.paths.data_dir / "f_final.npz"
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        jnp.savez(save_path, f=f, t=t, it=global_it)
+        print(f"Save state (f,t,it) to {save_path}")
 
     return f_hist, Efield_hist
 

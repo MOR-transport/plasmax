@@ -274,3 +274,62 @@ def plot_grad_info(cfg, inicond, adj_grad, fname):
         plt.close(fig)
     else:
         plt.show()
+
+
+def compare_auto_grad(cfg, adj_grad, auto_grad, fname):
+    fig, axs = plt.subplots(2, 2, figsize=(20, 20))
+    
+    pcm_adj_grad = axs[0][0].pcolormesh(cfg.grid.X, cfg.grid.V, adj_grad, shading="auto", cmap='turbo')
+    pcm_auto_grad = axs[0][1].pcolormesh(cfg.grid.X, cfg.grid.V, auto_grad, shading="auto", cmap='turbo')
+    pcm_diff_grad = axs[1][1].pcolormesh(cfg.grid.X, cfg.grid.V, jnp.abs(adj_grad-auto_grad), shading="auto", cmap='turbo')
+
+    fig.colorbar(pcm_adj_grad, ax=axs[0][0])
+    fig.colorbar(pcm_auto_grad, ax=axs[0][1])
+    fig.colorbar(pcm_diff_grad, ax=axs[1][1])
+
+    axs[0][0].set_title("Adjoint method differentiation")
+    axs[0][1].set_title("Automatic differentiation")
+    axs[1][1].set_title("Difference between")
+
+    axs[1][0].plot(cfg.grid.x, adj_grad[:, cfg.grid.nv //2], label="Adjoint method")
+    axs[1][0].plot(cfg.grid.x, auto_grad[:, cfg.grid.nv //2], label="Auto differentiation")
+    
+    axs[1][0].set_title(f"Comparison at v index {cfg.grid.nv // 2}")
+    axs[1][0].legend()
+
+    fig.tight_layout()
+    if fname is not None:
+        if str(fname)[-3:] == "png":
+            fig.savefig(fname)
+        elif str(fname)[-3:] == "tex":
+            save(fname, encoding="utf-8")
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def plot_opt_source(cfg, src, fname):
+    fig, axs = plt.subplots(1, 3, figsize=(40, 15))
+
+    pcm_src = axs[0].pcolormesh(cfg.grid.X, cfg.grid.V, src[0], shading="auto", cmap='turbo')
+    fig.colorbar(pcm_src, ax=axs[0])
+    axs[0].set_title(f"Optimization source at time t = {0:.2f}")
+
+    Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
+    pcm_src = axs[1].pcolormesh(cfg.grid.X, cfg.grid.V, src[Nt // 2], shading="auto", cmap='turbo')
+    fig.colorbar(pcm_src, ax=axs[1])
+    axs[1].set_title(f"Optimization source at time t = {(Nt // 2)*cfg.time.dt:.2f}")
+
+    pcm_src = axs[2].pcolormesh(cfg.grid.X, cfg.grid.V, src[-1], shading="auto", cmap='turbo')
+    fig.colorbar(pcm_src, ax=axs[2])
+    axs[2].set_title(f"Optimization source at time t = {cfg.time.tend:.2f}")
+
+    fig.tight_layout()
+    if fname is not None:
+        if str(fname)[-3:] == "png":
+            fig.savefig(fname)
+        elif str(fname)[-3:] == "tex":
+            save(fname, encoding="utf-8")
+        plt.close(fig)
+    else:
+        plt.show()
