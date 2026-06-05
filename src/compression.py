@@ -350,6 +350,61 @@ class PeriodicScimbaINR(eqx.Module):
         h = jnp.concatenate([x_embedded, v_coord], axis=-1)
         return self.network(h)
 
+
+class SIRENScimbaINR(eqx.Module):
+    """Wrapper for a SIREN architecture"""
+    layers: tuple
+    omega_0: float
+
+    def __init__(self, in_size: int, out_size: int, hidden_sizes: list[int], omega_0: float, key: jax.Array):
+        self.omega_0 = omega_0
+        keys = jax.random.split(key, len(hidden_sizes) + 1)
+        sizes = [in_size] + hidden_sizes + [out_size]
+        
+        layers = []
+        for i in range(len(sizes) - 1):
+            layers.append(eqx.nn.Linear(sizes[i], sizes[i + 1], key=keys[i]))
+        self.layers = tuple(layers)
+
+    def __call__(self, x_input: jnp.ndarray) -> jnp.ndarray:
+        x = jnp.sin(self.omega_0 * self.layers[0](x_input))
+        
+        for layer in self.layers[1:-1]:
+            x = jnp.sin(layer(x))
+            
+        return self.layers[-1](x)
+
+    def ndof(self) -> int:
+        flat_params, _ = jax.tree_util.tree_flatten(self)
+        return sum(p.size for p in flat_params if isinstance(p, jnp.ndarray))
+
+
+class PeriodicSIRENScimbaINR(eqx.Module):
+    """Wrapper pour forcer la périodicité spatiale sur un SIREN."""
+    network: SIRENScimbaINR
+
+    def __init__(self, hidden_sizes: list[int], omega_0: float, key: jax.Array):
+        self.network = SIRENScimbaINR(
+            in_size=3,
+            out_size=1,
+            hidden_sizes=hidden_sizes,
+            omega_0=omega_0,
+            key=key
+        )
+
+    def __call__(self, x_input: jnp.ndarray) -> jnp.ndarray:
+        x_coord = x_input[0:1]
+        v_coord = x_input[1:2]
+        
+        kx = 2.0 * jnp.pi
+        x_embedded = jnp.concatenate([
+            jnp.cos(kx * x_coord),
+            jnp.sin(kx * x_coord)
+        ], axis=-1)
+        
+        h = jnp.concatenate([x_embedded, v_coord], axis=-1)
+        return self.network(h)
+
 class FourierScimbaINR(eqx.Module):
     """
     Wrapper for Fourier features
@@ -425,9 +480,9 @@ def get_inr_model(arch: str, key: jax.Array) -> eqx.Module:
     elif arch == "mlp_128": return MLP(2, 1, [128]*3, "tanh", key)
     elif arch == "deep_128": return MLP(2, 1, [128]*5, "tanh", key)
 
-    elif arch == "siren": return MLP(2, 1, [64]*3, "sin", key)
-    elif arch == "siren_128": return MLP(2, 1, [128]*3, "sin", key)
-    elif arch == "siren_deep_128": return MLP(2, 1, [128]*5, "sin", key)
+    elif arch == "siren": return SIRENScimbaINR(2, 1, [64]*3, 30.0, key)
+    elif arch == "siren_128": return SIRENScimbaINR(2, 1, [128]*3, 30.0, key)
+    elif arch == "siren_deep_128": return SIRENScimbaINR(2, 1, [128]*5, 30.0, key)
     
     elif arch == "fourier_mlp": return FourierScimbaINR(2, 16, [64]*3, 10.0, key)
     elif arch == "fourier_mlp_128": return FourierScimbaINR(2, 16, [128]*3, 10.0, key)
@@ -436,9 +491,9 @@ def get_inr_model(arch: str, key: jax.Array) -> eqx.Module:
     elif arch == "periodic_mlp_16": return PeriodicScimbaINR([16]*3, "tanh", key)
     elif arch == "periodic_mlp_64": return PeriodicScimbaINR([64]*3, "tanh", key)
     
-    elif arch == "periodic_siren": return PeriodicScimbaINR([64]*3, "sin", key)
-    elif arch == "periodic_siren_128": return PeriodicScimbaINR([128]*3, "sin", key)
-    elif arch == "periodic_siren_deep_128": return PeriodicScimbaINR([128]*5, "sin", key)
+    elif arch == "periodic_siren": return PeriodicSIRENScimbaINR([64]*3, 30.0, key)
+    elif arch == "periodic_siren_128": return PeriodicSIRENScimbaINR([128]*3, 30.0, key)
+    elif arch == "periodic_siren_deep_128": return PeriodicSIRENScimbaINR([128]*5, 30.0, key)
     
     elif arch == "periodic_fourier_mlp": return PeriodicFourierScimbaINR(16, [64]*3, 10.0, key)
     elif arch == "periodic_fourier_mlp_128": return PeriodicFourierScimbaINR(16, [128]*3, 10.0, key)
