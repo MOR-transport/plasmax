@@ -72,18 +72,20 @@ class Interp:
     """Advection interpolation settings (e.g. Lagrange ``order``)."""
     order: int = 3
 
-@dataclass 
+
+@dataclass
 class Restart:
     """Configuration for restarting from a saved state"""
-    enabled: bool = False 
+    enabled: bool = False
     file: str | None = None
-    
-@dataclass 
+
+
+@dataclass
 class IoConfig:
-    save_dir: str | None = None 
-    compression_method: str | None = None 
-    dt_save: float | None = None 
-    restart: Restart = field(default_factory=Restart) 
+    save_dir: str | None = None
+    compression_method: str | None = None
+    dt_save: float | None = None
+    restart: Restart = field(default_factory=Restart)
 
 
 @dataclass(frozen=True)
@@ -140,26 +142,29 @@ class Config:
 def load_config(path: str | Path) -> Config:
     with open(path, encoding="utf-8") as f:
         data: dict[str, Any] = yaml.safe_load(f)
-    
+
     io_data = data.get("io", {})
     restart_data = io_data.get("restart", {})
     restart = Restart(**restart_data) if restart_data else Restart()
-    
+
     io_cfg = IoConfig(
         save_dir=io_data.get("save_dir"),
         compression_method=io_data.get("compression_method"),
         dt_save=io_data.get("dt_save"),
         restart=restart
     )
-    
+
     inicond = IniCond(**data["inicond"])
     paths = Paths.from_case(inicond.case, io_cfg.save_dir)
-    
+
     optim_data = data.get("optim", {})
     optim = Optim(**optim_data) if optim_data else Optim(target=inicond.case)
-    cfg = Config( inicond=inicond, grid=Grid(**data["grid"]), time=Time(**data["time"]),
-                paths=paths, io=io_cfg, optim=optim,method=str(data.get("method", "predcorr")),
-                physics=Physics(**(data.get("physics") or {})), interp=Interp(**(data.get("interp") or data.get("opt_interp") or {})))
+    cfg = Config(inicond=inicond, grid=Grid(**data["grid"]),
+                 time=Time(**data["time"]),
+                 paths=paths, io=io_cfg, optim=optim,
+                 method=str(data.get("method", "predcorr")),
+                 physics=Physics(**(data.get("physics") or {})),
+                 interp=Interp(**(data.get("interp") or data.get("opt_interp") or {})))
     # test if inicondition fits periodically in domain
     if cfg.inicond.k is not None:
         assert jnp.abs(cfg.grid.lx - 2*jnp.pi/cfg.inicond.k) < 1e-12, f"grid.lx = {cfg.grid.lx} != 2*pi/k = {2*jnp.pi/cfg.inicond.k}"

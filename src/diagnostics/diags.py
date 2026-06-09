@@ -438,7 +438,7 @@ def main():
     }
 
     cases_data = []
-    
+
     if args.output_dir:
         figure_dir = Path(args.output_dir)
     elif len(args.params) > 1:
@@ -455,15 +455,15 @@ def main():
         figure_dir = Path("results") / case_folder / "comparisons" / sub_folder
     else:
         figure_dir = None
-    
+
     for params_path_str in args.params:
         params_path = Path(params_path_str)
         if not params_path.exists():
             print(f"Warning: Params file '{params_path}' not found. Skipping.")
             continue
-        
+
         if params_path.suffix == ".csv":
-            case_name = params_path.parent.parent.name 
+            case_name = params_path.parent.parent.name
             csv_path = params_path
             if figure_dir is None:
                 figure_dir = params_path.parent.parent / "plots"
@@ -473,7 +473,7 @@ def main():
             csv_path = cfg.paths.data_dir / "diagnostics.csv"
             if figure_dir is None:
                 figure_dir = cfg.paths.plot_dir
-                
+
         if not csv_path.exists():
             print(f"Warning: {csv_path} not found for {case_name}. Run simulation first.")
             continue

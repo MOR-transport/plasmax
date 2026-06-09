@@ -11,7 +11,6 @@ from tikzplotlib import save
 
 from .config import Grid
 from .sim import run_time_loop
-from .source import maxwell_distrib
 
 jax.config.update("jax_enable_x64", True)
 
@@ -22,7 +21,7 @@ def plot_time_error(cfg, src=None, format="png"):
     if dt_ref - jnp.ceil(dt_ref) != 0:
         raise ValueError("Invalid time step: dt must be a negative power of 2")
     cfg.time.plot_freq = 0
-    
+
     dt_ref = jnp.int32(dt_ref)
     print(f"{-dt_ref-1} computations needed for error in time")
 
@@ -61,7 +60,7 @@ def plot_time_error(cfg, src=None, format="png"):
     ax.set_xlabel("time step Δt")
     ax.set_ylabel("L2 error")
     ax.set_title(f"Errors in time for ({cfg.inicond.case}) (Kn = {cfg.physics.knudsen:.0e})")
-    
+
     plt.minorticks_off()
     ax.set_xticks(dts)
     ax.set_xticklabels(dts)
@@ -69,7 +68,7 @@ def plot_time_error(cfg, src=None, format="png"):
     ax.legend()
     ax.grid(True, which="both")
 
-    folder = Path(f"plots/errors")
+    folder = Path("plots/errors")
     folder.mkdir(parents=True, exist_ok=True)
 
     if format == "png":
@@ -84,7 +83,7 @@ def plot_time_error(cfg, src=None, format="png"):
 def plot_space_error(cfg, src=None, format="png"):
     if cfg.grid.nx != cfg.grid.nv:
         raise ValueError("Invalid space step: dx and dv must be equal")
-    
+
     nxv_backup = cfg.grid.nx
     lx_backup = cfg.grid.lx
     lv_backup = cfg.grid.lv
@@ -113,7 +112,7 @@ def plot_space_error(cfg, src=None, format="png"):
 
         ratio = nxv_backup // step
 
-        err = jnp.sqrt(jnp.mean((f - f_ref[::ratio, ::ratio]) ** 2))  
+        err = jnp.sqrt(jnp.mean((f - f_ref[::ratio, ::ratio]) ** 2))
         errors_nxvs.append(err)
         nxvs.append(step)
 
@@ -124,7 +123,7 @@ def plot_space_error(cfg, src=None, format="png"):
     log_err_nxv = jnp.log(errors_nxvs)
     p_nxv, C_nxv = jnp.polyfit(log_nxv, log_err_nxv, 1)
 
-    order_dx = -p_nxv 
+    order_dx = -p_nxv
     print(f"Estimated convergence order in space: {order_dx:.3f}")
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -143,7 +142,7 @@ def plot_space_error(cfg, src=None, format="png"):
     ax.legend()
     ax.grid(True, which="both")
 
-    folder = Path(f"plots/errors")
+    folder = Path("plots/errors")
     folder.mkdir(parents=True, exist_ok=True)
 
     if format == "png":

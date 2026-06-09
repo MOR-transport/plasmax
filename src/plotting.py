@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-#compatibility patch for tikzplotlib
+# Compatibility patch for tikzplotlib
 import matplotlib.backends.backend_pgf as backend_pgf
 if not hasattr(backend_pgf, "common_texification") and hasattr(backend_pgf, "_tex_escape"):
     backend_pgf.common_texification = backend_pgf._tex_escape
@@ -61,14 +61,14 @@ def plot_Efield(cfg, Efield: jnp.ndarray, t, fname: str) -> None:
 
 def plot_profile(cfg, f_hist: jnp.ndarray, format="png", nb_profiles=3) -> None:
     fig, axs = plt.subplots(1, 2, figsize=(25, 10))
-    
+
     axs[0].set_xlabel(r"$v$")
     axs[0].set_ylabel(r"$f(x=" + str(cfg.grid.dx * cfg.grid.nx//2) + ", v, t= .)$")
-    axs[0].set_title(f"Profile in v")
-    
+    axs[0].set_title("Profile in v")
+
     axs[1].set_xlabel(r"$x$")
     axs[1].set_ylabel(r"$f(x, v=" + str(cfg.grid.dv * cfg.grid.nv//2) + ", t= .)$")
-    axs[1].set_title(f"Profile in x")
+    axs[1].set_title("Profile in x")
 
     nt = f_hist.shape[0]
     for it in range(1, nb_profiles+1):
@@ -80,9 +80,9 @@ def plot_profile(cfg, f_hist: jnp.ndarray, format="png", nb_profiles=3) -> None:
     axs[0].legend()
     axs[1].legend()
 
-    folder = Path(f"plots/simulation/sim_default")
+    folder = Path("plots/simulation/sim_default")
     if not folder.exists():
-        raise("Error : simulation folder doesn't exists")
+        raise FileNotFoundError("Error : simulation folder doesn't exists")
     if format == "png":
         fig.savefig(folder / "profile.png")
     elif format == "tex":
@@ -95,15 +95,15 @@ def plot_energy(cfg, Efield_hist, format="png"):
 
     Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
     t = jnp.linspace(0, cfg.time.tend, Nt)
-    
+
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.semilogy(t, energy)
 
     ax.set_xlabel(r"time $t$")
     ax.set_ylabel(r"$E_\text{pot}$")
-    ax.set_title(f"Potential energy")
+    ax.set_title("Potential energy")
 
-    folder = Path(f"plots/simulation/sim_default")
+    folder = Path("plots/simulation/sim_default")
     if format == "png":
         fig.savefig(folder / "energy.png")
     elif format == "tex":
@@ -114,7 +114,7 @@ def plot_energy(cfg, Efield_hist, format="png"):
 def make_anim_1d(cfg, hist, fname):
     fig, ax = plt.subplots()
     frames = []
-    
+
     ax.set_xlim(0, cfg.grid.lx)
     ax.set_xlabel('x')
     ax.set_ylabel('Valeur')
@@ -142,7 +142,8 @@ def make_anim_2d(cfg, hist, fname):
     limits = [0, cfg.grid.lx, -cfg.grid.lv, cfg.grid.lv]
 
     for frame_data in hist:
-        im = ax.imshow(frame_data, extent=limits, origin='lower', cmap='turbo', vmin=val_min, vmax=val_max, animated=True)
+        im = ax.imshow(frame_data, extent=limits, origin='lower', cmap='turbo',
+                       vmin=val_min, vmax=val_max, animated=True)
         frames.append([im])
 
     fig.colorbar(im, ax=ax, label='Valeur')

@@ -21,11 +21,11 @@ def maxwell_distrib(cfg: Config, f: jnp.ndarray) -> jnp.ndarray:
     T_row = T[None, :]
 
     MF = (n_row / jnp.sqrt(2 * jnp.pi * T_row)) * jnp.exp(- ((v_col - u_row)**2) / (2 * T_row))
-    
+
     return (MF - f) / cfg.physics.knudsen
 
 
-def gaussian_xv(cfg, a=5):    
+def gaussian_xv(cfg, a=5):
     v_col = cfg.grid.v[:, None]
     res = (1 / (2*jnp.pi)) * jnp.exp((-v_col**2) / 2*a)
     return jnp.broadcast_to(res, (cfg.grid.nv, cfg.grid.nx))[None, :, :]

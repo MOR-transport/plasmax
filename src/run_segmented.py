@@ -46,12 +46,12 @@ def main():
     #paths update in the configuration
     cfg.paths = Paths.from_case(cfg.inicond.case, new_save_dir)
     cfg.paths.data_dir.mkdir(parents=True, exist_ok=True)
-    
-    #clean up the old csv file if we restart the experiment from scratch
-    diag_file = cfg.paths.data_dir / "diagnostics.csv" 
+
+    # Clean up the old csv file if we restart the experiment from scratch
+    diag_file = cfg.paths.data_dir / "diagnostics.csv"
     if diag_file.exists():
-        diag_file.unlink() 
-        
+        diag_file.unlink()
+
     current_time = 0.0
     cfg.io.restart.enabled = False 
     cfg.io.restart.file = None 
@@ -59,12 +59,12 @@ def main():
     
     while current_time < final_time - 1e-9:
         next_time = min(current_time + dt_seg, final_time)
-        
+
         print("\n" + "="*60)
         print(f"-> Running segment: t= {current_time:.2f} to t={next_time:.2f}")
         print("="*60 + "\n")
-        
-        #update of end time for this segment
+
+        # Update of end time for this segment
         cfg.time.tend = next_time
         
         t0_sim = time.perf_counter()
@@ -73,8 +73,8 @@ def main():
         sim_time = t1_sim - t0_sim
         
         current_time = next_time
-        
-        #interception and compression
+
+        # Interception and compression
         file_path = cfg.paths.data_dir / "f_final.npz"
         data = jnp.load(file_path)
         f_full = data['f']
@@ -147,6 +147,7 @@ def main():
         cfg.io.restart.file = str(file_path)
         
     print(f"\n Segmented simulation finished successfully. Results saved in '{new_save_dir}' ")
-    
+
+
 if __name__ == "__main__":
     main()

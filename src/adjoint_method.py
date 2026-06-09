@@ -23,7 +23,7 @@ def functionnal(cfg, f_hist, fexp):
     return jnp.sum(integrant) * cfg.time.dt * cfg.grid.dx * cfg.grid.dv
 
 
-def run_time_loop_adjoint(cfg, Efield, src):
+def run_time_loop_adjoint(cfg, Efield, src, verbose=False):
     grid = cfg.grid
 
     f = jnp.zeros((grid.nv, grid.nx), dtype=jnp.float64)
@@ -41,68 +41,73 @@ def run_time_loop_adjoint(cfg, Efield, src):
         t0 = time_module.perf_counter()
 
         f = advect_with_source_hist(f, Efield[-it, :], grid, cfg.time.dt, cfg.interp.order, src, -it)
-        
+
         t += cfg.time.dt
         tcpu.append(time_module.perf_counter() - t0)
 
         f_hist = f_hist.at[-it, :, :].set(f)
-        print(f"iter: {it}, time: {t:.6g}, dt: {cfg.time.dt:.6g}, "f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
+        if verbose:
+            print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.6g}, "
+                  f"cpu_time: {tcpu[-1]:.4f} s", flush=True)
 
     cfg.time.dt = - cfg.time.dt
     total = sum(tcpu)
-    print(
-        f"\n=== Simulation complete ===\n"
-        f"iterations: {len(tcpu)}, final time: {t:.6g}, total CPU: {total:.3f} s\n"
-        f"avg step: {total / max(len(tcpu), 1):.4f} s",
-        flush=True,
-    )
+    if verbose:
+        print(
+            f"\n=== Simulation complete ===\n"
+            f"iterations: {len(tcpu)}, final time: {t:.6g}, total CPU: {total:.3f} s\n"
+            f"avg step: {total / max(len(tcpu), 1):.4f} s",
+            flush=True,
+        )
 
     return f_hist
 
 
 def line_search_step(cfg, alpha, inicond, adj):
 
-    inicond_tmp = inicond + alpha * adj
-    f_new, Efield_new = run_time_loop(cfg, inicond=inicond_tmp)
+    inicond_new = inicond + alpha * adj
+    f_new, Efield_new = run_time_loop(cfg, inicond=inicond_new, verbose=False)
 
-    return inicond_tmp, f_new, Efield_new, alpha
+    return inicond_new, f_new, Efield_new, alpha
 
 
-def line_search(cfg, inicond, f, fexp, adj, big_alpha, m=1e-4, theta=0.5):
-    alpha = big_alpha
-    
+def line_search(cfg, inicond, f, fexp, adj, alpha_init, m=1e-4, theta=0.5):
+    alpha = alpha_init
+
     if alpha <= 1e-8:
         return line_search_step(cfg, alpha, inicond, adj)
-    
+
     J = lambda f: functionnal(cfg, f, fexp)
-    
+
     while True:
         print(f"\nTRY ALPHA = {alpha}")
 
-        inicond_tmp, f_new, Efield_new, alpha = line_search_step(cfg, alpha, inicond, adj)
-        
+        inicond_tmp, f_new, Efield_new, alpha = line_search_step(cfg, alpha,
+                                                                 inicond, adj)
+
         armijo_cond = J(f_new) <= J(f) - m*alpha*jnp.sum(adj**2)
         if armijo_cond:
             return inicond_tmp, f_new, Efield_new, alpha
-        
+
         alpha *= theta
         if alpha <= 1e-8:
             return line_search_step(cfg, alpha, inicond, adj)
 
 
-def adjoint(cfg, line_search_opt=True, tolerance=0.0001, format="png"):
+def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
     cfg.time.plot_freq = 0
 
     inicond_exp = get_inicond_exp(cfg)(cfg.grid.X, cfg.grid.V)
-    f_exp, _ = run_time_loop(cfg, inicond=inicond_exp)
+    f_exp, _ = run_time_loop(cfg, inicond=inicond_exp, verbose=False)
 
-    inicond_initiale = get_inicond(cfg)(cfg.grid.X, cfg.grid.V)  
+    inicond_initiale = get_inicond(cfg)(cfg.grid.X, cfg.grid.V)
     inicond = inicond_initiale.copy()
     residuals = []
     alphas = []
     grads = []
+    stepsize = cfg.optim.lr
 
-    folder = Path(f"plots/optimization/default_optim/")
+    folder = Path("plots/optimization/default_optim/")
     folder_it = folder / "iterations"
 
     if folder.exists() and folder.is_dir():
@@ -111,30 +116,47 @@ def adjoint(cfg, line_search_opt=True, tolerance=0.0001, format="png"):
 
     folder_it.mkdir(parents=True)
 
-    f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond)
-    plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp, folder_it / f"opt_{0:04d}.png")
+    print("\n# ========== Start running the simulation framework ========== %")
+
+    f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond, verbose=False)
+    plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp,
+                      folder_it / f"opt_{0:04d}.png")
 
     for it in range(1, cfg.optim.Nopt+1):
-
+        print(f"##### Iteration {it:3d} #####")
         residuals.append(functionnal(cfg, f_hist, f_exp))
-        
-        src = compute_src(cfg, f_hist, f_exp)
-        adj_hist = run_time_loop_adjoint(cfg, Efield_hist, src)
-
-        grads.append(jnp.sqrt(jnp.sum(adj_hist[0, :, :] ** 2)))
-        if grads[-1] <= tolerance:
-            cfg.optim.Nopt = it + 1
+        # Halting condition : progress in the objective function
+        if it > 1 and residuals[-2]-residuals[-1] < tolerance*residuals[-2]:
+            cfg.optim.Nopt = it
+            print("Insufficient progression")
             break
 
+        src = compute_src(cfg, f_hist, f_exp)
+        adj_hist = run_time_loop_adjoint(cfg, Efield_hist, src, verbose=False)
+
+        grads.append(jnp.sqrt(jnp.sum(adj_hist[0, :, :] ** 2)))
+        # Halting condition : norm of the gradient
+        # if grads[-1] <= tolerance:
+        #     cfg.optim.Nopt = it + 1
+        #    break
+
         if line_search_opt:
-            inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(), f_hist, f_exp, adj_hist[0, :, :], cfg.optim.lr)
+            inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(),
+                                                              f_hist, f_exp,
+                                                              adj_hist[0, :, :],
+                                                              stepsize)
             alphas.append(alpha)
-            plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp, folder_it / f"opt_{it:04d}.{format}")
+            stepsize = alpha
+            plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist,
+                              f_exp, folder_it / f"opt_{it:04d}.{format}")
         else:
             inicond += cfg.optim.lr * adj_hist[0, :, :]
-            f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond)
-            plot_optimisation(cfg, residuals, grads, cfg.optim.lr, inicond, f_hist, f_exp, folder_it / f"opt_{it:04d}.{format}")
+            f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond, verbose=False)
+            plot_optimisation(cfg, residuals, grads, stepsize, inicond, f_hist,
+                              f_exp, folder_it / f"opt_{it:04d}.{format}")
+        print("\n")
 
+    print("# ============= Simulation framework terminates ============= %")
     make_anim_2d(cfg, f_hist, folder / "f_res.gif")
 
 
@@ -146,11 +168,11 @@ def optimize(cfg):
 
     adjoint(cfg, line_search_opt=True, format="png")
 
-    
+
 def main():
     parser = argparse.ArgumentParser(description="Vlasov–Poisson driver (predcorr / NuFI stub).")
     parser.add_argument("--params", type=str, required=True, help="Base yaml config file")
     args = parser.parse_args()
-    
+
     cfg = load_config(args.params)
     optimize(cfg)

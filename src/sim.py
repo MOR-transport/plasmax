@@ -39,28 +39,29 @@ def step(f: jnp.ndarray, cfg, t: float, src=None) -> tuple[jnp.ndarray, jnp.ndar
                              "(expected predcorr or nufi).")
 
 
-def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tuple[jnp.ndarray, jnp.ndarray, float]:
+def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
+                  verbose=True) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     """Advance ``f`` until ``time >= cfg.time.tend`` or ``nt_max`` steps."""
     grid = cfg.grid
 
-    # f and t initialization 
+    # f and t initialization
     if cfg.io.restart.enabled and cfg.io.restart.file:
-        restart_path = Path(cfg.io.restart.file) 
+        restart_path = Path(cfg.io.restart.file)
         if not restart_path.exists():
             raise FileNotFoundError(f"Restart file '{restart_path}' not found.")
-        
+
         # Loading .npz archive
         data = jnp.load(restart_path)
         f = data['f']
         t = float(data["t"])
         it_offset = int(data["it"])
-        
+
         # Check the compatibility of the dimensions
         if f.shape != (grid.nv, grid.nx):
             raise ValueError(f"Restart file shape {f.shape} != grid shape ({grid.nv}, {grid.nx})")
-        
+
         print(f"Restarting from {restart_path} at t = {t:.6g}")
-    
+
     else:
         if inicond is None:
             f0 = get_inicond(cfg)
@@ -69,11 +70,12 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
             f = inicond
         t = 0.0
         it_offset = 0  # No offset if we start at 0
-        print(f"Starting from analytical initial condition")
-        
+        if verbose:
+            print("Starting from analytical initial condition")
+
     rho = compute_density(f, grid.dv)
     Efield = vpoisson(rho, grid, cfg.physics.charge)
-    
+
     if cfg.time.plot_freq > 0:
         folder = Path("plots/simulation/sim_default")
         folder_f = folder / "iterations/solution"
@@ -91,12 +93,12 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
     # Number of iterations from the initial time
     remaining = max(0.0, cfg.time.tend - t)
     nt_cap = min(cfg.time.nt_max, int(math.ceil(remaining / cfg.time.dt)))
-    if nt_cap <=0: 
+    if nt_cap <= 0:
         print("Nothing to simulate (tend already reached).")
-        return jnp.empty((0, grid.nv, grid.nx)), jnp.empty((0, grid.nx))        
-    
+        return jnp.empty((0, grid.nv, grid.nx)), jnp.empty((0, grid.nx))
+
     tcpu = []
-    
+
     if nb_profile > 0:
         fig, axs = plt.subplots(2, 1, figsize=(16, 10))
 
@@ -107,8 +109,8 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
 
     Efield_hist = jnp.empty((nt_cap+1, grid.nx), dtype=jnp.float64)
     Efield_hist = Efield_hist.at[0, :].set(Efield)
-    
-    global_it = it_offset 
+
+    global_it = it_offset
     if global_it == 0:
         measure(cfg, f, Efield, global_it, t)
     for it in range(1, nt_cap + 1):
@@ -121,10 +123,12 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
 
         f_hist = f_hist.at[it, :, :].set(f)
         Efield_hist = Efield_hist.at[it, :].set(Efield)
-        
+
         measure(cfg, f, Efield, global_it, t)
 
-        print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.2f}, cpu_time: {tcpu[-1]:.2f} s", flush=True)
+        if verbose:
+            print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.2f}, "
+                  f"cpu_time: {tcpu[-1]:.2f} s", flush=True)
         if cfg.time.plot_freq > 0 and it % cfg.time.plot_freq == 0:
             plot_solution(cfg, f, t,
                           str(cfg.paths.plot_dir / f"solution_{it:04d}.{format}"))
@@ -139,12 +143,13 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0) -> tu
         print("Warning: reached nt_max before Tend.", flush=True)
 
     total = sum(tcpu)
-    print(
-        f"\n=== Simulation complete ===\n"
-        f"Nb of iterations: {len(tcpu)}, final time: {t:.6g}, total CPU: {total:.3f} s\n"
-        f"Average step time: {total / max(len(tcpu), 1):.4f} s",
-        flush=True,
-    )
+    if verbose:
+        print(
+            f"\n=== Simulation complete ===\n"
+            f"Nb of iterations: {len(tcpu)}, final time: {t:.6g}, total CPU: {total:.3f} s\n"
+            f"Average step time: {total / max(len(tcpu), 1):.4f} s",
+            flush=True,
+        )
 
     if nb_profile > 0:
         axs[0].legend()

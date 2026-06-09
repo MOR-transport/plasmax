@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from .advect import advect, advect_with_source
 from .config import Config, Grid
 from .physics import compute_density, vpoisson
-from .source import maxwell_distrib
+from functools import partial
 
 
 def predictor_corrector_step(
@@ -15,15 +15,19 @@ def predictor_corrector_step(
     grid: Grid,
     cfg: Config,
     time: float,
-    src = None
+    src=None
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
-    del time  
+    del time
     dt = cfg.time.dt
     ord_ = cfg.interp.order
     q_m = cfg.physics.charge / cfg.physics.mass
 
     if src is not None:
-        advection = lambda f, efield, grid, dt, order: advect_with_source(f, efield, grid, dt, order, lambda p: src(cfg, p))
+        advection = partial(
+            advect_with_source,
+            source=partial(src, cfg)
+        )
+
     else:
         advection = advect
 
