@@ -62,7 +62,7 @@ def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path,
 
 #INR Architecture Registry   
 
-class PeriodicScimbaINR(eqx.Module):
+class PeriodicMLPScimbaINR(eqx.Module):
     """ 
     Wrapper to force periodic boundary conditions on the x axis
     """
@@ -232,8 +232,8 @@ def get_inr_model(arch: str, key: jax.Array) -> eqx.Module:
     elif arch == "fourier_mlp_128": return FourierScimbaINR(2, 16, [128]*3, 10.0, key)
     elif arch == "fourier_mlp_deep_128": return FourierScimbaINR(2, 16, [128]*5, 10.0, key)
     
-    elif arch == "periodic_mlp_16": return PeriodicScimbaINR([16]*3, "tanh", key)
-    elif arch == "periodic_mlp_64": return PeriodicScimbaINR([64]*3, "tanh", key)
+    elif arch == "periodic_mlp_16": return PeriodicMLPScimbaINR([16]*3, "tanh", key)
+    elif arch == "periodic_mlp_64": return PeriodicMLPScimbaINR([64]*3, "tanh", key)
     
     elif arch == "periodic_siren": return PeriodicSIRENScimbaINR([64]*3, 30.0, key)
     elif arch == "periodic_siren_128": return PeriodicSIRENScimbaINR([128]*3, 30.0, key)

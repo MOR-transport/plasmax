@@ -39,7 +39,11 @@ You can easily plot the conserved quantities (Energy, Mass) and the truncation e
 **Example:** Comparing baseline with different POD ranks:
 
 ```bash
-plasmax-diags --params results/case_two_stream/baseline/data/diagnostics.csv results/case_two_stream/segmented/POD/r32/data/diagnostics.csv results/case_two_stream/segmented/POD/r8/data/diagnostics.csv --etot --epot --mass --frob --format png
+plasmax-diags --params results/case_two_stream/baseline/data/diagnostics.csv \
+results/case_two_stream/segmented/POD/r2/data/diagnostics.csv \
+results/case_two_stream/segmented/POD/r8/data/diagnostics.csv \
+results/case_two_stream/segmented/POD/r32/data/diagnostics.csv \
+--etot --epot --mass --frob-pod --format png
 ```
 
 **Note:** The script features intelligent routing. The comparison plots (e.g., `etot_comparison.png`, `mass_comparison.png`) will be automatically saved in specialized sub-directories such as `results/case_two_stream/comparisons/baseline_vs_POD/` or `baseline_vs_INR/` based on the data provided
