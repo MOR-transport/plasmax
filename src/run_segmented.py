@@ -1,12 +1,12 @@
 import argparse 
-from pathlib import Path 
-from .config import load_config, Paths 
-from .sim import run_time_loop 
+import pickle 
 import jax
 import jax.numpy as jnp
 import numpy as np
-
-import pickle 
+import time
+from pathlib import Path 
+from .config import load_config, Paths 
+from .sim import run_time_loop 
 from .compression import compress_inr, compress_pod, AVAILABLE_INR_ARCHS
 from .plotting import plot_inr_benchmark_comparison, plot_loss_history
 
@@ -66,7 +66,12 @@ def main():
         
         #update of end time for this segment
         cfg.time.tend = next_time
+        
+        t0_sim = time.perf_counter()
         run_time_loop(cfg)
+        t1_sim = time.perf_counter()
+        sim_time = t1_sim - t0_sim
+        
         current_time = next_time
         
         #interception and compression
@@ -81,12 +86,15 @@ def main():
         
         if compression == "POD":
             print(f"\n[POD] Applying compression (rank={args.rank}) to saved state...")
-            f_comp = compress_pod(f_full, args.rank, current_time, plot_dir, cfg.paths.data_dir)
+            f_comp = compress_pod(f_full, args.rank, current_time, plot_dir, cfg.paths.data_dir, sim_time)
             #overwrite the saved state with the compressed version
             jnp.savez(file_path, f=f_comp, t=t_saved, it=it_saved)
             print(f"[POD] Done\n")
             
         elif compression == "INR":
+            #dynamic decreasing of learning rate
+            n_segments = max(0.0, (current_time / dt_seg) -1.0)
+            dynamic_lr = 1e-3 / (2.0 ** n_segments) # we divide the lr by 2 every new segment
             print(f"\n[INR] Applying Neural Network compression...")
             f_comp, current_nn_params, loss_history = compress_inr(
                 f_full=f_full,
@@ -97,7 +105,10 @@ def main():
                 current_time=current_time,
                 data_dir=cfg.paths.data_dir,
                 arch=args.arch,
-                params_init=current_nn_params
+                params_init=current_nn_params,
+                lr=dynamic_lr,
+                lbfgs_iters=50,
+                sim_time=sim_time
             )
             
             #benchmark architectures

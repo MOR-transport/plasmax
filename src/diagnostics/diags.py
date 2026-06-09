@@ -229,7 +229,7 @@ def plot_frob_errors(cases_data: list[dict], figure_dir: Path,fmt: str, show_inr
     ax.set_ylabel("Relative Frobenius Error", fontsize=14, labelpad=10)
 
     if show_pod and show_inr:
-        title = "Compression Error: POD vs INR (All Architectures)"
+        title = "Compression Error: POD vs INR"
     elif show_inr:
         title = "INR Compression Error — Architecture Comparison"
     else:
@@ -311,6 +311,84 @@ def plot_inr_loss_curves(cases_data: list[dict], figure_dir: Path,fmt: str):
     save_figure(fig, figure_dir / "inr_loss_convergence", fmt)
     plt.close(fig)        
     
+def plot_cpu_time(cases_Data: list[dict], figure_dir: Path, fmt: str):
+    """ Generate stacked bar chart for CPU times (Simulation + Compression)"""
+    labels = []
+    sim_times = []
+    comp_times = []
+    
+    for case in cases_Data:
+        data_dir = case["csv_path"].parent
+        folder_name = data_dir.parent.name
+        
+        inr_path = data_dir / "inr_errors.csv"
+        pod_path = data_dir / "pod_frobenius_errors.csv"
+        
+        sim_t = 0.0
+        comp_t = 0.0
+        label = folder_name
+        
+        #INR
+        if inr_path.exists():
+            with open(inr_path, "r") as f:
+                reader = list(csv.DictReader(f))
+                if not reader: continue #if the file is empty, skip
+                if "sim_time" in reader[0]:
+                    sim_t = sum(float(row["sim_time"]) for row in reader) 
+                    comp_t = sum(float(row["comp_time"]) for row in reader)
+                label = f"INR {reader[-1].get('arch', folder_name)}"
+        #POD
+        elif pod_path.exists():
+            with open(pod_path, "r") as f:
+                reader = list(csv.DictReader(f))
+                if not reader: continue
+                if "sim_time" in reader[0]:
+                    sim_t = sum(float(row["sim_time"]) for row in reader) 
+                    comp_t = sum(float(row["comp_time"]) for row in reader)
+                label = f"POD {folder_name}"
+        else:
+            continue 
+        
+        if sim_t > 0 or comp_t > 0:
+            labels.append(label)
+            sim_times.append(sim_t)
+            comp_times.append(comp_t)
+    
+    if not labels:
+        print("Warning: No CPU time data found (need 'sim_time' and 'comp_time' in inr_errors.csv or pod_frobenius_errors.csv files).")
+        return
+    
+    fig, ax = plt.subplots(figsize=(12, 7))
+    x = np.arange(len(labels))
+    width = 0.5
+    
+    ax.bar(x, sim_times, width, label='Simulation Time', color='#1f77b4', edgecolor='black')
+    ax.bar(x, comp_times, width, bottom=sim_times, label='Compression / Training Time', color='#ff7f0e', edgecolor='black')
+    
+    #add time labels on bars
+    for i, (sim_t, comp_t) in enumerate(zip(sim_times, comp_times)):
+        #write simulation time in the middle of the blue bar
+        ax.text(i, sim_t / 2, f"{sim_t:.1f}s", ha='center', va='center', color='white', fontweight='bold', fontsize=11)
+        # write compression time
+        total_height = sim_t + comp_t
+        if comp_t < 1.0:
+            #if the compression time is small, we write it above the orange bar to avoid overlap
+            ax.text(i, total_height + max(comp_times)*0.02, f"{comp_t:.2f}s", ha='center', va='bottom', color='black', fontweight='bold', fontsize=11)
+        else:
+            # if the time is large (like inr), we write it in the middle of the orange bar
+            ax.text(i, sim_t + (comp_t / 2), f"{comp_t:.1f}s", ha='center', va='center', color='black', fontweight='bold', fontsize=11)
+    
+    ax.set_ylabel('Total CPU Time (s)', fontsize=14)
+    ax.set_title('Computational Cost: Simulation vs Compression', fontsize=16, pad=15)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=12)
+    ax.legend(fontsize=12, frameon=True, edgecolor='black')
+    ax.grid(True, axis='y', linestyle='--', alpha=0.6)
+    #add some space on top of the highest bar for better visualization of labels
+    ax.set_ylim(0, max(sim_times[i] + comp_times[i] for i in range(len(labels))) * 1.1)
+    fig.tight_layout()
+    save_figure(fig, figure_dir / "cpu_time_comparison", fmt)
+    plt.close(fig)
 
 def main():
     parser = argparse.ArgumentParser(description="Generate plots from diagnostics.csv")
@@ -326,6 +404,7 @@ def main():
     parser.add_argument("--frob-pod", action = "store_true", help="Plot only the Frobenius error of POD")
     parser.add_argument("--frob-inr", action = "store_true", help="Plot only the Frobenius error of INR (all architectures)")
     parser.add_argument("--inr-loss", action="store_true", help="Plot the INR final loss per segment and per architecture")
+    parser.add_argument("--cpu-time", action="store_true", help="Plot Stacked CPU times")
     parser.add_argument("--all", action="store_true", help="Generate all plots (default if no specific flags)")
     parser.add_argument("--format", choices=["png", "tex", "both"], default="both", help="Output format (default: both)")
     parser.add_argument("--output-dir", type=str, default=None, help="Override output directory")
@@ -333,7 +412,7 @@ def main():
     args = parser.parse_args()
 
     if not any((args.epot, args.ekin, args.etot, args.mass, args.momentum,
-                args.l2norm, args.frob, args.frob_pod, args.frob_inr, args.inr_loss)):
+                args.l2norm, args.frob, args.frob_pod, args.frob_inr, args.inr_loss, args.cpu_time)):
         args.all = True
 
     quantities = []
@@ -349,7 +428,6 @@ def main():
         quantities.append("momentum")
     if args.all or args.l2norm:
         quantities.append("l2norm")
-
     name_mapping = {
         "epot": "epot",
         "ekin": "ekin",
@@ -469,6 +547,10 @@ def main():
     # final loss per segment
     if args.all or args.inr_loss:
         plot_inr_loss_curves(cases_data, figure_dir, args.format)
+    
+    #cpu time
+    if args.all or args.cpu_time:
+        plot_cpu_time(cases_data, figure_dir, args.format)
  
     print(f"\nPlots saved to {figure_dir}.")
 

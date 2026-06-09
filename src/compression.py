@@ -1,12 +1,13 @@
 import jax
 import jax.numpy as jnp 
-import flax.linen as nn 
-import optax 
+#import flax.linen as nn 
+#import optax 
 import matplotlib.pyplot as plt
 import equinox as eqx
+import time
 from pathlib import Path
 from typing import Any
-from functools import partial 
+#from functools import partial 
 from scimba_jax.nonlinear_approximation.networks.mlp import MLP
 from scimba_jax.nonlinear_approximation.optimizers.optimizers import ScimbaAdam, ScimbaLBfgs
 from jax.flatten_util import ravel_pytree
@@ -14,8 +15,9 @@ from jax.flatten_util import ravel_pytree
 jax.config.update("jax_enable_x64", True)
 
 # POD
-def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path, data_dir: Path) -> jnp.ndarray:
+def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path, data_dir: Path, sim_time: float = 0.0) -> jnp.ndarray:
     """Apply SVD, plot the spectrum, calculate the error and reconstruct the distribution f with rank r"""
+    t0 = time.perf_counter()
     #SVD calculation
     U, s, VT = jnp.linalg.svd(f, full_matrices=False)
     
@@ -23,14 +25,26 @@ def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path,
     total_energy = jnp.sum(s**2)
     truncated_energy = jnp.sum(s[rank:]**2)
     error_frob = float(jnp.sqrt(truncated_energy / total_energy))
+    
+    #Truncation
+    U_r = U[:, :rank]
+    s_r = s[:rank]
+    VT_r = VT[:rank, :]
+    #reconstruction
+    f_comp = (U_r * s_r) @ VT_r
+    
+    t1 = time.perf_counter()
+    comp_time = t1 - t0
+    print(f"-> Frobenius Error: {error_frob:.2e}s | Sim Time: {sim_time:.2f} | Comp Time: {comp_time:.2f}s")
+
     #error saving
     error_file = data_dir / "pod_frobenius_errors.csv"
     if not error_file.exists():
         with open(error_file, "w") as f_err:
-            f_err.write("time,frobenius_error\n")
+            f_err.write("time,frobenius_error,sim_time,comp_time\n")
     
     with open(error_file, "a") as f_err:
-        f_err.write(f"{current_time:.4f},{error_frob:.6e}\n")
+        f_err.write(f"{current_time:.4f},{error_frob:.6e},{sim_time:.6e},{comp_time:.6e}\n")
     
     #plot of the normalized singular spectrum
     s_norm = s / s[0]
@@ -47,16 +61,6 @@ def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path,
     fig.tight_layout()
     fig.savefig(plot_dir / f"svd_spectrum_t{current_time:05.2f}.png", dpi=300, bbox_inches='tight')
     plt.close(fig)
-    
-    #Truncation
-    U_r = U[:, :rank]
-    s_r = s[:rank]
-    VT_r = VT[:rank, :]
-    
-    #reconstruction
-    f_comp = (U_r * s_r) @ VT_r
-    
-    print(f"-> Frobeniurs Error: {error_frob:.2e}")
     
     return f_comp   
 
@@ -266,14 +270,14 @@ def grad_loss_function(model: eqx.Module, batch: tuple) -> jnp.ndarray:
     flat_grads, _ = ravel_pytree(grads)
     return flat_grads 
 
-def log_inr_error(data_dir: Path, arch: str, current_time: float, final_loss: float, frob_error: float):
-    """Log loss + Frobenius error in inr_errors.csv """
+def log_inr_error(data_dir: Path, arch: str, current_time: float, final_loss: float, frob_error: float, sim_time: float, comp_time: float):
+    """Log loss + Frobenius error + CPU times in inr_errors.csv """
     error_file = data_dir / "inr_errors.csv"
     if not error_file.exists():
         with open(error_file, "w") as f:
-            f.write("time,arch,final_loss,frobenius_error\n")
+            f.write("time,arch,final_loss,frobenius_error,sim_time,comp_time\n")
     with open(error_file, "a") as f:
-        f.write(f"{current_time:.4f},{arch},{final_loss:.6e},{frob_error:.6e}\n")
+        f.write(f"{current_time:.4f},{arch},{final_loss:.6e},{frob_error:.6e},{sim_time:.6e},{comp_time:.6e}\n")
 
 def compress_inr(
     f_full: jnp.ndarray,
@@ -288,9 +292,13 @@ def compress_inr(
     lr: float = 1e-3,
     max_iters: int = 2000,
     batch_size: int = 2000,
-    threshold: float = 1e-8
+    threshold: float = 1e-8,
+    lbfgs_iters: int = 50,
+    sim_time: float = 0.0
 ):
     """Fit an INR network to approximate f_full using ADAM then L-BFGS"""
+    t0 = time.perf_counter()
+    
     x_raw = grid_X.flatten() / lx
     v_norm = grid_V.flatten() / lv
     
@@ -332,7 +340,6 @@ def compress_inr(
     full_batch = (inputs, targets)
     lbfgs_opt = ScimbaLBfgs(model, losses_function, grad_loss_function)
     
-    lbfgs_iters = 10 
     for i in range(lbfgs_iters):
         loss_dict, model, lbfgs_opt = lbfgs_opt.update(model, full_batch)
         loss_val = float(loss_dict["total"])
@@ -348,8 +355,13 @@ def compress_inr(
     f_comp = f_comp_flat.reshape(f_full.shape)
     
     frob_error = float(jnp.linalg.norm(f_comp - f_full) / jnp.linalg.norm(f_full))
-    print(f"[INR/{arch}] Final Loss: {loss_val:.2e} | Frobenius Error: {frob_error:.2e}\n")
     
-    log_inr_error(data_dir, arch, current_time, loss_val, frob_error)
+    t1 = time.perf_counter()
+    comp_time = t1 - t0
+    
+    print(f"[INR/{arch}] Final Loss: {loss_val:.2e} | Frobenius Error: {frob_error:.2e}\n")
+    print(f"[INR/{arch}] Sim Time: {sim_time:.2f}s | Comp Time: {comp_time:.2f}s\n")
+    
+    log_inr_error(data_dir, arch, current_time, loss_val, frob_error, sim_time, comp_time)
     
     return f_comp, model, jnp.array(loss_history)
