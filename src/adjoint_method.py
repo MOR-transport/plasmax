@@ -12,14 +12,14 @@ from .inicond import get_inicond, get_inicond_exp
 from .sim import run_time_loop
 from .advect import advect_with_source_hist
 from .plotting import make_anim_2d, plot_optimisation, plot_grad_info, compare_auto_grad, plot_opt_source
-from .source import get_filters_exp, compute_src
+from .source import get_filters_exp, compute_src 
 
 jax.config.update("jax_enable_x64", True)
 
 
 def functionnal(cfg, f_hist, fexp):
     sigxv, sigt = get_filters_exp(cfg)
-    integrant = (1/2) * (f_hist - fexp)**2 * sigxv * sigt
+    integrant = (1/2) * (f_hist - fexp)**2 * ( sigxv * sigt )
     return jnp.sum(integrant) * cfg.time.dt * cfg.grid.dx * cfg.grid.dv
 
 
@@ -90,7 +90,7 @@ def line_search(cfg, inicond, f, fexp, adj, alpha_init, m=1e-4, theta=0.5):
             return inicond_tmp, f_new, Efield_new, alpha
 
         alpha *= theta
-        if alpha <= 1e-8:
+        if alpha <= 1e-5:
             return line_search_step(cfg, alpha, inicond, adj)
 
 
@@ -114,27 +114,11 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
         f, _ = run_time_loop(cfg, inicond=inicond, auto_grad=True, verbose=False)
         return functionnal(cfg, f, f_exp)
 
-    folder = Path("optimization/default_optim/")
-    folder_it = folder / "iterations"
-    folder_step = folder_it / "step"
-    folder_grad = folder_it / "grad"
-    folder_opt_src = folder_it / "opt_src"
-    folder_auto_grad = folder_it / "comp_auto_grad"
-
-    if folder.exists() and folder.is_dir():
-        print("WARNING: Erasing existing optimization/default_optim/ folder!")
-        shutil.rmtree(folder)
-
-    folder_step.mkdir(parents=True)
-    folder_grad.mkdir(parents=True)
-    folder_opt_src.mkdir(parents=True)
-    folder_auto_grad.mkdir(parents=True)
-
     print("\n# ========== Start running the simulation framework ========== %")
 
     f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond, verbose=False)
     plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp,
-                      folder_step / f"opt_{0:04d}.png")
+                      cfg.paths.plot_dir / f"opt_{0:04d}.png")
 
     for it in range(1, cfg.optim.Nopt+1):
         print(f"##### Iteration {it:3d} #####")
@@ -168,21 +152,19 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
             stepsize = alpha
             iniconds.append(inicond.copy())
             plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist,
-                              f_exp, folder_step / f"opt_{it:04d}.{format}")
-            plot_grad_info(cfg, inicond_prec, -adj_hist[0, :, :], folder_grad / f"grad_{it:04d}.{format}")
-            plot_opt_source(cfg, src, folder_opt_src / f"opt_src_{it:04d}.{format}")
-            compare_auto_grad(cfg, -adj_hist[0, :, :], auto_grad, folder_auto_grad / f"auto_grad_{it:04d}.{format}")
+                              f_exp, cfg.paths.plot_dir / f"opt_{it:04d}.{format}")
+            plot_grad_info(cfg, inicond_prec, -adj_hist[0, :, :], cfg.paths.plot_dir / f"grad_{it:04d}.{format}")
+            plot_opt_source(cfg, src, cfg.paths.plot_dir / f"opt_src_{it:04d}.{format}")
+            compare_auto_grad(cfg, -adj_hist[0, :, :], auto_grad, cfg.paths.plot_dir / f"auto_grad_{it:04d}.{format}")
         else:
             inicond += cfg.optim.lr * adj_hist[0, :, :]
             iniconds.append(inicond.copy())
             f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond, verbose=False)
             plot_optimisation(cfg, residuals, grads, stepsize, inicond, f_hist,
-                              f_exp, folder_it / f"opt_{it:04d}.{format}")
+                              f_exp, cfg.paths.plot_dir / f"opt_{it:04d}.{format}")
         print("\n")
 
     print("# ============= Simulation framework terminates ============= %")
-    make_anim_2d(cfg, f_hist, folder / "f_res.gif")
-
     return iniconds, gradients
 
 
