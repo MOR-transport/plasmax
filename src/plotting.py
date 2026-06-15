@@ -194,7 +194,7 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     axs[0][0].set_title(r"Evolution of the functional $ J(f) $")
     axs[0][0].set_xticks(iterations)
     axs[0][0].set_yticks(residual)
-    axs[0][0].set_yticklabels(residual)
+    axs[0][0].set_yticklabels([f"{tick:.2e}" for tick in residual])
 
     axs[0][1].semilogy(iterations, grad, "x-")
     axs[0][1].set_xlabel("Iteration")
@@ -202,7 +202,7 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     axs[0][1].set_title(r"Evolution of the gradient $\left\| \nabla J(f) \right\|$")
     axs[0][1].set_xticks(iterations)
     axs[0][1].set_yticks(grad)
-    axs[0][1].set_yticklabels(grad)
+    axs[0][1].set_yticklabels([f"{tick:.2e}" for tick in grad])
 
     if jnp.isscalar(alphas):
         alphas = jnp.full(iterations.shape, alphas)
