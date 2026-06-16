@@ -300,6 +300,56 @@ def plot_loss_history(loss_history, t, arch_name, save_dir):
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
     
+def plot_pod_benchmark_comparison(f_sim, f_pod, grid_X, grid_V, t, rank, save_dir):
+    """
+    Plots a 3-panel comparison (Exact, POD Reconstructed, Signed Error)
+    at a specific checkpoint time t, PERFECTLY matching the INR layout and colors.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from pathlib import Path
+
+    # conversion en numpy si jamais ce sont des jax.array
+    f_sim_np = np.array(f_sim)
+    f_pod_np = np.array(f_pod)
     
+    # 1. Calcul de l'erreur signée (comme pour l'INR)
+    diff = f_sim_np - f_pod_np
     
+    # 2. Bornes identiques pour les deux premiers panneaux
+    vmax = max(np.max(f_sim_np), np.max(f_pod_np))
+    vmin = min(np.min(f_sim_np), np.min(f_pod_np))
     
+    # 3. Borne symétrique centrée sur 0 pour la carte d'erreur
+    abs_max_diff = np.max(np.abs(diff))
+    if abs_max_diff == 0:  # Évite une division par zéro ou échelle nulle si erreur parfaite
+        abs_max_diff = 1e-5
+    
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    
+    # Panneau 1 : Simulation Exacte (Viridis)
+    im0 = axes[0].pcolormesh(grid_X, grid_V, f_sim_np, cmap='viridis', shading="auto", vmin=vmin, vmax=vmax)
+    axes[0].set_title(f"Exact Simulation ($t={t:.1f}$)", fontsize=12)
+    axes[0].set_xlabel("x")
+    axes[0].set_ylabel("v")
+    fig.colorbar(im0, ax=axes[0])
+    
+    # Panneau 2 : Reconstruction POD (Viridis)
+    im1 = axes[1].pcolormesh(grid_X, grid_V, f_pod_np, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
+    axes[1].set_title(f"POD Reconstruction (r={rank})", fontsize=12)
+    axes[1].set_xlabel("x")
+    fig.colorbar(im1, ax=axes[1])
+    
+    # Panneau 3 : Carte d'Erreur Signée (Coolwarm centré en 0)
+    im2 = axes[2].pcolormesh(grid_X, grid_V, diff, cmap='coolwarm', shading='auto', vmin=-abs_max_diff, vmax=abs_max_diff)
+    axes[2].set_title("Error (f_sim - f_pod)", fontsize=12)
+    axes[2].set_xlabel("x")
+    fig.colorbar(im2, ax=axes[2])
+    
+    plt.tight_layout()
+    
+    # Formatage rigoureux du chemin et sauvegarde
+    save_path = Path(save_dir) / f"comparison_t{t:.1f}_r{rank}.png"
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"   [Benchmark] Saved POD plot to {save_path.name}")    
