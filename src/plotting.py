@@ -184,7 +184,6 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     axs[0][2].set_xlabel("Iteration")
     axs[0][2].set_ylabel(r"$\alpha$")
     axs[0][2].set_title(r"Evolution of the optimization step $\alpha$")
-<<<<<<< HEAD
     if jnp.isscalar(alphas):
         axs[0][2].plot(iterations, jnp.full(iterations.shape, alphas), "x-")
         axs[0][2].set_xticks(iterations)
@@ -199,11 +198,8 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
         alpha_iters = jnp.arange(1, len(alphas) + 1)
         axs[0][2].plot(alpha_iters, alphas, "x-")
         axs[0][2].set_xticks(alpha_iters)
-=======
-    axs[0][2].set_xticks(iterations)
-    axs[0][2].set_yticks(alphas)
-    axs[0][2].set_yticklabels(alphas)
->>>>>>> 846989b7130fb4abc5f5aeec8d6a02f998ee9259
+        axs[0][2].set_yticks(alphas)
+        axs[0][2].set_yticklabels([f"{tick:.2e}" for tick in alphas])
 
     vmin = jnp.min(f_exp[-1, :, :])
     vmax = jnp.max(f_exp[-1, :, :])
