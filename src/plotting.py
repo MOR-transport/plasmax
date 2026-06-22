@@ -170,16 +170,21 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     axs[0][0].set_ylabel(r"$\log J(f) $")
     axs[0][0].set_title(r"Evolution of the functional $ J(f) $")
     axs[0][0].set_xticks(iterations)
+    axs[0][0].set_yticks(residual)
+    axs[0][0].set_yticklabels([f"{tick:.2e}" for tick in residual])
 
     axs[0][1].semilogy(iterations, grad, "x-")
     axs[0][1].set_xlabel("Iteration")
     axs[0][1].set_ylabel(r"$\log \left\| \nabla J(f) \right\|$")
     axs[0][1].set_title(r"Evolution of the gradient $\left\| \nabla J(f) \right\|$")
     axs[0][1].set_xticks(iterations)
+    axs[0][1].set_yticks(grad)
+    axs[0][1].set_yticklabels([f"{tick:.2e}" for tick in grad])
 
     axs[0][2].set_xlabel("Iteration")
     axs[0][2].set_ylabel(r"$\alpha$")
     axs[0][2].set_title(r"Evolution of the optimization step $\alpha$")
+<<<<<<< HEAD
     if jnp.isscalar(alphas):
         axs[0][2].plot(iterations, jnp.full(iterations.shape, alphas), "x-")
         axs[0][2].set_xticks(iterations)
@@ -194,6 +199,11 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
         alpha_iters = jnp.arange(1, len(alphas) + 1)
         axs[0][2].plot(alpha_iters, alphas, "x-")
         axs[0][2].set_xticks(alpha_iters)
+=======
+    axs[0][2].set_xticks(iterations)
+    axs[0][2].set_yticks(alphas)
+    axs[0][2].set_yticklabels(alphas)
+>>>>>>> 846989b7130fb4abc5f5aeec8d6a02f998ee9259
 
     vmin = jnp.min(f_exp[-1, :, :])
     vmax = jnp.max(f_exp[-1, :, :])

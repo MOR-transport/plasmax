@@ -26,6 +26,8 @@ test = ["pytest"]
 [project.scripts]
 plasmax-sim = "src.sim:simulate"
 plasmax-optim = "src.adjoint_method:main"
+plasmax-optim-auto = "src.autodiff_method:main"
+plasmax-plot = "src.plot_optim:main"
 plasmax-diags = "src.diagnostics.diags:main"
 plasmax-segmented ="src.run_segmented:main"
 

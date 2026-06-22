@@ -39,13 +39,13 @@ def step(f: jnp.ndarray, cfg, t: float, src=None) -> tuple[jnp.ndarray, jnp.ndar
                              "(expected predcorr or nufi).")
 
 
-def run_time_loop(cfg, src=None, inicond=None, auto_grad=False, format="png", nb_profile=0,
+def run_time_loop(cfg, src=None, inicond=None, disabled_save=False, format="png", nb_profile=0,
                   verbose=True) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     """Advance ``f`` until ``time >= cfg.time.tend`` or ``nt_max`` steps."""
     grid = cfg.grid
 
     # f and t initialization
-    if cfg.io.restart.enabled and cfg.io.restart.file and not auto_grad:
+    if cfg.io.restart.enabled and cfg.io.restart.file and not disabled_save:
         restart_path = Path(cfg.io.restart.file)
         if not restart_path.exists():
             raise FileNotFoundError(f"Restart file '{restart_path}' not found.")
@@ -98,7 +98,7 @@ def run_time_loop(cfg, src=None, inicond=None, auto_grad=False, format="png", nb
     Efield_hist = Efield_hist.at[0, :].set(Efield)
 
     global_it = it_offset
-    if global_it == 0 and not auto_grad:
+    if global_it == 0 and not disabled_save:
         measure(cfg, f, Efield, global_it, t)
     for it in range(1, nt_cap + 1):
 
@@ -111,7 +111,7 @@ def run_time_loop(cfg, src=None, inicond=None, auto_grad=False, format="png", nb
         f_hist = f_hist.at[it, :, :].set(f)
         Efield_hist = Efield_hist.at[it, :].set(Efield)
 
-        if not auto_grad:
+        if not disabled_save:
             measure(cfg, f, Efield, global_it, t)
 
         if verbose:
@@ -136,7 +136,7 @@ def run_time_loop(cfg, src=None, inicond=None, auto_grad=False, format="png", nb
             flush=True,
         )
 
-    if not auto_grad:
+    if not disabled_save:
         # Save final distribution function and time to an .npz archive
         save_path = cfg.paths.data_dir / "f_final.npz"
         save_path.parent.mkdir(parents=True, exist_ok=True)
