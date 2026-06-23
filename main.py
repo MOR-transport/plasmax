@@ -8,6 +8,8 @@ from pathlib import Path
 from src.config import load_config
 from src.sim import simulate
 from src.adjoint_method import optimize
+from src.autodiff_method import optimize_autodiff
+from src.plot_optim import get_datas
 from src.convergence import plot_errors
 
 # Default YAML next to project root `python/`, sibling of `src/` and `params/`.
@@ -20,7 +22,7 @@ def main():
         description="Vlasov–Poisson driver (predcorr / NuFI stub).")
     parser.add_argument(
         "task",
-        choices=["sim", "opt", "err"],
+        choices=["sim", "opt", "opt-auto", "plot", "err"],
         help="La partie du programme à exécuter"
     )
     parser.add_argument(
@@ -38,6 +40,10 @@ def main():
         simulate(cfg)
     elif args.task == "opt":
         optimize(cfg)
+    elif args.task == "opt-auto":
+        optimize_autodiff(cfg)
+    elif args.task == "plot":
+        get_datas(cfg)
     elif args.task == "err":
         plot_errors(cfg)
 

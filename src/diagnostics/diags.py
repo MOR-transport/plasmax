@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import importlib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,43 +14,10 @@ if TYPE_CHECKING:
 
 
 def export2tikz(fig: "mpl.figure.Figure", out_tex_path: Path) -> bool:
-    """Best-effort tikzplotlib export with compatibility shims."""
+    """Export a matplotlib figure to PGFPlots/TikZ via save_fig."""
     try:
-        from matplotlib.legend import Legend
-        import matplotlib.backends.backend_pgf as backend_pgf
-        import numpy as np
-        import webcolors
-
-        if not hasattr(backend_pgf, "common_texification") and hasattr(backend_pgf, "_tex_escape"):
-            backend_pgf.common_texification = backend_pgf._tex_escape
-        if not hasattr(np, "float_"):
-            np.float_ = np.float64
-        if not hasattr(Legend, "legendHandles"):
-            Legend.legendHandles = property(
-                lambda self: getattr(self, "legend_handles", self.get_lines())
-            )
-        if not hasattr(Legend, "_ncol"):
-            Legend._ncol = property(lambda self: getattr(self, "_ncols", 1))
-        if not hasattr(webcolors, "CSS3_NAMES_TO_HEX"):
-            css3_names = list(webcolors.names("css3"))
-            webcolors.CSS3_NAMES_TO_HEX = {
-                name: webcolors.name_to_hex(name, spec="css3") for name in css3_names
-            }
-        if not hasattr(webcolors, "CSS3_HEX_TO_NAMES"):
-            webcolors.CSS3_HEX_TO_NAMES = {
-                hex_value: name for name, hex_value in webcolors.CSS3_NAMES_TO_HEX.items()
-            }
-
-        tikzplotlib = importlib.import_module("tikzplotlib")
-        tikzplotlib.save(
-            out_tex_path,
-            figure=fig,
-            extra_axis_parameters=[
-                "width=1\\figurewidth",
-                "height=1\\figureheight",
-            ],
-        )
-        print(f"Saved TikZ plot to '{out_tex_path}'")
+        from ..utils import save_fig
+        save_fig(out_tex_path, fig)
         return True
     except Exception as exc:
         print(f"Warning: TikZ export skipped ({exc})")
@@ -76,18 +42,10 @@ def load_diagnostics(csv_path: Path) -> tuple[list[float], dict[str, list[float]
     return times, data
 
 
-def save_figure(fig: plt.Figure, output_path: Path, fmt: str = "both"):
-    """save figure in png and/or tikz format."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if fmt in ["png", "both"]:
-        png_path = output_path.with_suffix(".png")
-        fig.savefig(png_path, dpi=150, bbox_inches="tight")
-        print(f"Saved png plot to '{png_path}'")
-
-    if fmt in ["tex", "both"]:
-        tex_path = output_path.with_suffix(".tex")
-        export2tikz(fig, tex_path)
+def save_figure(fig: plt.Figure, output_path: Path) -> None:
+    """Save figure as PNG and TikZ."""
+    from ..utils import save_fig
+    save_fig(output_path.with_suffix(".png"), fig, dpi=150, bbox_inches="tight")
 
 
 def main():
@@ -102,8 +60,6 @@ def main():
     parser.add_argument("--l2norm", action="store_true", help="Plot L2 Norm")
     parser.add_argument("--frob", action="store_true", help="Plot Frobenius Error")
     parser.add_argument("--all", action="store_true", help="Generate all plots (default if no specific flags)")
-
-    parser.add_argument("--format", choices=["png", "tex", "both"], default="both", help="Output format (default: both)")
 
     parser.add_argument("--output-dir", type=str, default=None, help="Override output directory")
 
@@ -223,7 +179,7 @@ def main():
             filename = f"{quantity}_comparaison"
 
         output_path = figure_dir / filename
-        save_figure(fig, output_path, args.format)
+        save_figure(fig, output_path)
         plt.close(fig)
 
     # Frobenius error plot

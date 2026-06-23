@@ -11,15 +11,15 @@ from .config import load_config
 from .inicond import get_inicond, get_inicond_exp
 from .sim import run_time_loop
 from .advect import advect_with_source_hist
-from .plotting import make_anim_2d, plot_optimisation
-from .source import get_filters_exp, compute_src
+from .plotting import make_anim_2d, plot_optimisation, plot_grad_info, compare_auto_grad, plot_opt_source
+from .source import get_filters_exp, compute_src 
 
 jax.config.update("jax_enable_x64", True)
 
 
 def functionnal(cfg, f_hist, fexp):
     sigxv, sigt = get_filters_exp(cfg)
-    integrant = (1/2) * (f_hist - fexp)**2 * sigxv * sigt
+    integrant = (1/2) * (f_hist - fexp)**2 * ( sigxv * sigt )
     return jnp.sum(integrant) * cfg.time.dt * cfg.grid.dx * cfg.grid.dv
 
 
@@ -63,19 +63,19 @@ def run_time_loop_adjoint(cfg, Efield, src, verbose=False):
     return f_hist
 
 
-def line_search_step(cfg, alpha, inicond, adj):
+def line_search_step(cfg, alpha, inicond, grad):
 
-    inicond_new = inicond + alpha * adj
-    f_new, Efield_new = run_time_loop(cfg, inicond=inicond_new, verbose=False)
+    inicond_new = inicond - alpha * grad
+    f_new, Efield_new = run_time_loop(cfg, inicond=inicond_new, disabled_save=True, verbose=False)
 
     return inicond_new, f_new, Efield_new, alpha
 
 
-def line_search(cfg, inicond, f, fexp, adj, alpha_init, m=1e-4, theta=0.5):
+def line_search(cfg, inicond, f, fexp, grad, alpha_init, m=1e-4, theta=0.5):
     alpha = alpha_init
 
     if alpha <= 1e-8:
-        return line_search_step(cfg, alpha, inicond, adj)
+        return line_search_step(cfg, alpha, inicond, grad)
 
     J = lambda f: functionnal(cfg, f, fexp)
 
@@ -83,48 +83,45 @@ def line_search(cfg, inicond, f, fexp, adj, alpha_init, m=1e-4, theta=0.5):
         print(f"\nTRY ALPHA = {alpha}")
 
         inicond_tmp, f_new, Efield_new, alpha = line_search_step(cfg, alpha,
-                                                                 inicond, adj)
+                                                                 inicond, grad)
 
-        armijo_cond = J(f_new) <= J(f) - m*alpha*jnp.sum(adj**2)
+        armijo_cond = J(f_new) <= J(f) - m*alpha*jnp.sum(grad**2)
         if armijo_cond:
             return inicond_tmp, f_new, Efield_new, alpha
 
         alpha *= theta
-        if alpha <= 1e-8:
-            return line_search_step(cfg, alpha, inicond, adj)
+        if alpha <= 1e-5:
+            return line_search_step(cfg, alpha, inicond, grad)
 
 
 def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
     cfg.time.plot_freq = 0
 
     inicond_exp = get_inicond_exp(cfg)(cfg.grid.X, cfg.grid.V)
-    f_exp, _ = run_time_loop(cfg, inicond=inicond_exp, verbose=False)
+    f_exp, _ = run_time_loop(cfg, inicond=inicond_exp, disabled_save=True, verbose=False)
 
-    inicond_initiale = get_inicond(cfg)(cfg.grid.X, cfg.grid.V)
+    inicond_initiale = jnp.zeros((cfg.grid.nv, cfg.grid.nx))
     inicond = inicond_initiale.copy()
-    residuals = []
-    alphas = []
-    grads = []
     stepsize = cfg.optim.lr
 
-    folder = Path("plots/optimization/default_optim/")
-    folder_it = folder / "iterations"
-
-    if folder.exists() and folder.is_dir():
-        print("WARNING: Erasing existing plots/optimization/default_optim/ folder!")
-        shutil.rmtree(folder)
-
-    folder_it.mkdir(parents=True)
+    residuals = []
+    norm_grads = []
+    gradients = []
+    alphas = []
+    iniconds = [inicond.copy()]
+    f_hists = []
+    opt_srcs = []
 
     print("\n# ========== Start running the simulation framework ========== %")
 
-    f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond, verbose=False)
-    plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist, f_exp,
-                      folder_it / f"opt_{0:04d}.png")
+    f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond, disabled_save=True, verbose=False)
+    f_hists.append(f_hist)
 
     for it in range(1, cfg.optim.Nopt+1):
         print(f"##### Iteration {it:3d} #####")
+        
         residuals.append(functionnal(cfg, f_hist, f_exp))
+        
         # Halting condition : progress in the objective function
         if it > 1 and residuals[-2]-residuals[-1] < tolerance*residuals[-2]:
             cfg.optim.Nopt = it
@@ -132,32 +129,40 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
             break
 
         src = compute_src(cfg, f_hist, f_exp)
+        opt_srcs.append(src)
         adj_hist = run_time_loop_adjoint(cfg, Efield_hist, src, verbose=False)
+        grad = - adj_hist[0, :, :]
 
-        grads.append(jnp.sqrt(jnp.sum(adj_hist[0, :, :] ** 2)))
+        gradients.append(grad.copy())
+        norm_grads.append(jnp.sqrt(jnp.sum(grad ** 2) / (cfg.grid.lx * cfg.grid.lv)))
+        
         # Halting condition : norm of the gradient
-        # if grads[-1] <= tolerance:
+        # if norm_grads[-1] <= tolerance:
         #     cfg.optim.Nopt = it + 1
         #    break
 
         if line_search_opt:
             inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(),
                                                               f_hist, f_exp,
-                                                              adj_hist[0, :, :],
+                                                              grad,
                                                               stepsize)
-            alphas.append(alpha)
             stepsize = alpha
-            plot_optimisation(cfg, residuals, grads, alphas, inicond, f_hist,
-                              f_exp, folder_it / f"opt_{it:04d}.{format}")
+
+            alphas.append(alpha)
+            iniconds.append(inicond.copy())
+            f_hists.append(f_hist)
         else:
-            inicond += cfg.optim.lr * adj_hist[0, :, :]
-            f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond, verbose=False)
-            plot_optimisation(cfg, residuals, grads, stepsize, inicond, f_hist,
-                              f_exp, folder_it / f"opt_{it:04d}.{format}")
+            inicond -= cfg.optim.lr * grad
+            f_hist, Efield_hist = run_time_loop(cfg, inicond=inicond, disabled_save=True, verbose=False)
+
+            alphas.append(stepsize)
+            iniconds.append(inicond.copy())
+            f_hists.append(f_hist)
+
         print("\n")
 
     print("# ============= Simulation framework terminates ============= %")
-    make_anim_2d(cfg, f_hist, folder / "f_res.gif")
+    return residuals, norm_grads, gradients, alphas, iniconds, f_hists, f_exp, opt_srcs
 
 
 def optimize(cfg):
@@ -166,7 +171,20 @@ def optimize(cfg):
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
 
-    adjoint(cfg, line_search_opt=True, format="png")
+    residuals, norm_grads, gradients, alphas, iniconds, f_hists, f_exp, opt_srcs = adjoint(cfg, line_search_opt=True)
+
+    save_path = cfg.paths.data_dir / "adj_diff_optim.npz"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    jnp.savez(save_path, 
+              residuals=residuals, 
+              norm_grads=norm_grads, 
+              gradients=gradients, 
+              alphas=alphas, 
+              iniconds=iniconds, 
+              f_hists=f_hists,
+              opt_srcs=opt_srcs,
+              f_exp=f_exp)
+    print(f"Save optimization datas to {save_path}")
 
 
 def main():

@@ -5,12 +5,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-# Compatibility patch for tikzplotlib
-import matplotlib.backends.backend_pgf as backend_pgf
-if not hasattr(backend_pgf, "common_texification") and hasattr(backend_pgf, "_tex_escape"):
-    backend_pgf.common_texification = backend_pgf._tex_escape
-from tikzplotlib import save
-
+from .utils import save_fig
 from .config import Config
 
 
@@ -33,10 +28,7 @@ def plot_solution(cfg, f: jnp.ndarray, t: float, fname: str) -> None:
     ax.set_title(f"Solution at t = {t:.2f}")
     fig.tight_layout()
     if fname is not None:
-        if str(fname)[-3:] == "png":
-            fig.savefig(fname)
-        elif str(fname)[-3:] == "tex":
-            save(fname, encoding="utf-8")
+        save_fig(fname, fig)
         plt.close(fig)
     else:
         plt.show()
@@ -49,16 +41,13 @@ def plot_Efield(cfg, Efield: jnp.ndarray, t, fname: str) -> None:
     ax.set_title(f"Electric field at t = {t:.2f}")
     fig.tight_layout()
     if fname is not None:
-        if str(fname)[-3:] == "png":
-            fig.savefig(fname)
-        elif str(fname)[-3:] == "tex":
-            save(fname, encoding="utf-8")
+        save_fig(fname, fig)
         plt.close(fig)
     else:
         plt.show()
 
 
-def plot_profile(cfg, f_hist: jnp.ndarray, format="png", nb_profiles=3) -> None:
+def plot_profile(cfg, f_hist: jnp.ndarray, nb_profiles=3) -> None:
     fig, axs = plt.subplots(1, 2, figsize=(25, 10))
 
     axs[0].set_xlabel(r"$v$")
@@ -79,17 +68,11 @@ def plot_profile(cfg, f_hist: jnp.ndarray, format="png", nb_profiles=3) -> None:
     axs[0].legend()
     axs[1].legend()
 
-    folder = Path("plots/simulation/sim_default")
-    if not folder.exists():
-        raise FileNotFoundError("Error : simulation folder doesn't exists")
-    if format == "png":
-        fig.savefig(folder / "profile.png")
-    elif format == "tex":
-        save(folder / "profile.tex", encoding="utf-8")
+    save_fig(cfg.paths.plot_dir / "profile.png", fig)
     plt.close(fig)
 
 
-def plot_energy(cfg, Efield_hist, format="png"):
+def plot_energy(cfg, Efield_hist):
     energy = (1/2) * jnp.sum(Efield_hist ** 2, axis=1) * cfg.grid.dx
 
     Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
@@ -102,11 +85,7 @@ def plot_energy(cfg, Efield_hist, format="png"):
     ax.set_ylabel(r"$E_\text{pot}$")
     ax.set_title("Potential energy")
 
-    folder = Path("plots/simulation/sim_default")
-    if format == "png":
-        fig.savefig(folder / "energy.png")
-    elif format == "tex":
-        save(folder / "energy.tex", encoding="utf-8")
+    save_fig(cfg.paths.plot_dir / "energy.png", fig)
     plt.close(fig)
 
 
@@ -162,10 +141,7 @@ def plot_source(cfg: Config, source, f: jnp.ndarray, fname):
     ax.set_title(f"Source ({cfg.inicond.case})")
     fig.tight_layout()
     if fname is not None:
-        if str(fname)[-3:] == "png":
-            fig.savefig(fname)
-        elif str(fname)[-3:] == "tex":
-            save(fname, encoding="utf-8")
+        save_fig(fname, fig)
     else:
         plt.show()
 
@@ -179,10 +155,7 @@ def plot_inicond(cfg, inicond: jnp.ndarray, fname: str) -> None:
     ax.set_title(f"Initial condition ({cfg.inicond.case})")
     fig.tight_layout()
     if fname is not None:
-        if str(fname)[-3:] == "png":
-            fig.savefig(fname)
-        elif str(fname)[-3:] == "tex":
-            save(fname, encoding="utf-8")
+        save_fig(fname, fig)
     else:
         plt.show()
     plt.close(fig)
@@ -197,28 +170,43 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     axs[0][0].set_ylabel(r"$\log J(f) $")
     axs[0][0].set_title(r"Evolution of the functional $ J(f) $")
     axs[0][0].set_xticks(iterations)
+    axs[0][0].set_yticks(residual)
+    axs[0][0].set_yticklabels([f"{tick:.2e}" for tick in residual])
 
     axs[0][1].semilogy(iterations, grad, "x-")
     axs[0][1].set_xlabel("Iteration")
     axs[0][1].set_ylabel(r"$\log \left\| \nabla J(f) \right\|$")
     axs[0][1].set_title(r"Evolution of the gradient $\left\| \nabla J(f) \right\|$")
     axs[0][1].set_xticks(iterations)
+    axs[0][1].set_yticks(grad)
+    axs[0][1].set_yticklabels([f"{tick:.2e}" for tick in grad])
 
-    if jnp.isscalar(alphas):
-        alphas = jnp.full(iterations.shape, alphas)
-
-    axs[0][2].plot(iterations, alphas, "x-")
     axs[0][2].set_xlabel("Iteration")
     axs[0][2].set_ylabel(r"$\alpha$")
     axs[0][2].set_title(r"Evolution of the optimization step $\alpha$")
-    axs[0][2].set_xticks(iterations)
+    if jnp.isscalar(alphas):
+        axs[0][2].plot(iterations, jnp.full(iterations.shape, alphas), "x-")
+        axs[0][2].set_xticks(iterations)
+    elif len(alphas) == 0:
+        axs[0][2].text(
+            0.5, 0.5, "no line search",
+            ha="center", va="center", transform=axs[0][2].transAxes,
+        )
+        axs[0][2].set_xticks([])
+        axs[0][2].set_yticks([])
+    else:
+        alpha_iters = jnp.arange(1, len(alphas) + 1)
+        axs[0][2].plot(alpha_iters, alphas, "x-")
+        axs[0][2].set_xticks(alpha_iters)
+        axs[0][2].set_yticks(alphas)
+        axs[0][2].set_yticklabels([f"{tick:.2e}" for tick in alphas])
 
     vmin = jnp.min(f_exp[-1, :, :])
     vmax = jnp.max(f_exp[-1, :, :])
 
-    pcm_inicond = axs[1][0].pcolormesh(cfg.grid.X, cfg.grid.V, inicond, shading="auto", cmap='turbo', vmin=vmin, vmax=vmax) # norm=mcolors.PowerNorm(gamma=0.3, vmin=vmin, vmax=vmax))
-    pcm_f = axs[1][1].pcolormesh(cfg.grid.X, cfg.grid.V, f[-1, :, :], shading="auto", cmap='turbo', vmin=vmin, vmax=vmax) # norm=mcolors.PowerNorm(gamma=0.3, vmin=vmin, vmax=vmax))
-    pcm_fexp = axs[1][2].pcolormesh(cfg.grid.X, cfg.grid.V, f_exp[-1, :, :], shading="auto", cmap='turbo', vmin=vmin, vmax=vmax) # norm=mcolors.PowerNorm(gamma=0.3, vmin=vmin, vmax=vmax))
+    pcm_inicond = axs[1][0].pcolormesh(cfg.grid.X, cfg.grid.V, inicond, shading="auto", cmap='turbo', vmin=vmin, vmax=vmax)
+    pcm_f = axs[1][1].pcolormesh(cfg.grid.X, cfg.grid.V, f[-1, :, :], shading="auto", cmap='turbo', vmin=vmin, vmax=vmax)
+    pcm_fexp = axs[1][2].pcolormesh(cfg.grid.X, cfg.grid.V, f_exp[-1, :, :], shading="auto", cmap='turbo', vmin=vmin, vmax=vmax)
 
     fig.colorbar(pcm_inicond, ax=axs[1][0])
     fig.colorbar(pcm_f, ax=axs[1][1])
@@ -230,19 +218,98 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
 
     axs[1][1].set_xlabel(r"$x$")
     axs[1][1].set_ylabel(r"$v$")
-    axs[1][1].set_title(r"Function $f$")
+    axs[1][1].set_title(r"Function $f$ at final time")
 
     axs[1][2].set_xlabel(r"$x$")
     axs[1][2].set_ylabel(r"$v$")
-    axs[1][2].set_title(r"Function $f^{exp}$")
+    axs[1][2].set_title(r"Function $f^{exp}$ at final time")
 
     fig.tight_layout()
 
     if fname is not None:
-        if str(fname)[-3:] == "png":
-            fig.savefig(fname)
-        elif str(fname)[-3:] == "tex":
-            save(fname, encoding="utf-8")
+        save_fig(fname, fig)
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def plot_grad_info(cfg, inicond, adj_grad, fname):
+    fig, axs = plt.subplots(1, 3, figsize=(40, 15))
+
+    axs[0].plot(cfg.grid.x, inicond[cfg.grid.nv // 2, :], label="Initial condition")
+    axs[0].plot(cfg.grid.x, adj_grad[cfg.grid.nv // 2, :], label="Gradient")
+    axs[0].legend()
+    axs[0].set_title(f"Comparison of initial condition and gradient at v = {-cfg.grid.lv + cfg.grid.dv * (cfg.grid.nv // 2):.2f}")
+    axs[0].set_xlabel(r"$x$")
+
+    axs[1].plot(cfg.grid.v, inicond[:, cfg.grid.nx // 2], label="Initial condition")
+    axs[1].plot(cfg.grid.v, adj_grad[:, cfg.grid.nx // 2], label="Gradient")
+    axs[1].legend()
+    axs[1].set_title(f"Comparison of initial condition and gradient at x = {cfg.grid.dx * (cfg.grid.nx // 2):.2f}")
+    axs[1].set_xlabel(r"$v$")
+
+    pcm_grad = axs[2].pcolormesh(cfg.grid.X, cfg.grid.V, adj_grad, shading="auto", cmap='turbo')
+    fig.colorbar(pcm_grad, ax=axs[2])
+    axs[2].set_xlabel(r"$x$")
+    axs[2].set_ylabel(r"$v$")
+
+    fig.tight_layout()
+
+    if fname is not None:
+        save_fig(fname, fig)
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def compare_auto_grad(cfg, adj_grad, auto_grad, fname):
+    fig, axs = plt.subplots(2, 2, figsize=(20, 20))
+
+    pcm_adj_grad = axs[0][0].pcolormesh(cfg.grid.X, cfg.grid.V, adj_grad, shading="auto", cmap='turbo')
+    pcm_auto_grad = axs[0][1].pcolormesh(cfg.grid.X, cfg.grid.V, auto_grad, shading="auto", cmap='turbo')
+    pcm_diff_grad = axs[1][1].pcolormesh(cfg.grid.X, cfg.grid.V, jnp.abs(adj_grad-auto_grad), shading="auto", cmap='turbo')
+
+    fig.colorbar(pcm_adj_grad, ax=axs[0][0])
+    fig.colorbar(pcm_auto_grad, ax=axs[0][1])
+    fig.colorbar(pcm_diff_grad, ax=axs[1][1])
+
+    axs[0][0].set_title("Adjoint method differentiation")
+    axs[0][1].set_title("Automatic differentiation")
+    axs[1][1].set_title("Difference between")
+
+    axs[1][0].plot(cfg.grid.x, adj_grad[:, cfg.grid.nv //2], label="Adjoint method")
+    axs[1][0].plot(cfg.grid.x, auto_grad[:, cfg.grid.nv //2], label="Auto differentiation")
+
+    axs[1][0].set_title(f"Comparison at v index {cfg.grid.nv // 2}")
+    axs[1][0].legend()
+
+    fig.tight_layout()
+    if fname is not None:
+        save_fig(fname, fig)
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def plot_opt_source(cfg, src, fname):
+    fig, axs = plt.subplots(1, 3, figsize=(40, 15))
+
+    pcm_src = axs[0].pcolormesh(cfg.grid.X, cfg.grid.V, src[0], shading="auto", cmap='turbo')
+    fig.colorbar(pcm_src, ax=axs[0])
+    axs[0].set_title(f"Optimization source at time t = {0:.2f}")
+
+    Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
+    pcm_src = axs[1].pcolormesh(cfg.grid.X, cfg.grid.V, src[Nt // 2], shading="auto", cmap='turbo')
+    fig.colorbar(pcm_src, ax=axs[1])
+    axs[1].set_title(f"Optimization source at time t = {(Nt // 2)*cfg.time.dt:.2f}")
+
+    pcm_src = axs[2].pcolormesh(cfg.grid.X, cfg.grid.V, src[-1], shading="auto", cmap='turbo')
+    fig.colorbar(pcm_src, ax=axs[2])
+    axs[2].set_title(f"Optimization source at time t = {cfg.time.tend:.2f}")
+
+    fig.tight_layout()
+    if fname is not None:
+        save_fig(fname, fig)
         plt.close(fig)
     else:
         plt.show()

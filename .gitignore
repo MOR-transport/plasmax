@@ -1,5 +1,6 @@
 **__pycache__
-plots/
+optimization/
+error_estimation/
 results/
 *.csv
 *.png
@@ -33,3 +34,6 @@ __pycache__/
 # Backup files
 *~
 *.bak
+
+# Video files
+*.mp4

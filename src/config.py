@@ -150,7 +150,14 @@ def load_config(path: str | Path) -> Config:
         restart=restart
     )
 
-    inicond = IniCond(**data["inicond"])
+    inicond_data = data.get("inicond")
+    if inicond_data:
+        inicond = IniCond(**inicond_data)
+    else:
+        params_path = Path(path)
+        inferred_case = params_path.stem
+        inicond = IniCond(case=inferred_case)
+
     paths = Paths.from_case(inicond.case, io_cfg.save_dir)
 
     optim_data = data.get("optim", {})

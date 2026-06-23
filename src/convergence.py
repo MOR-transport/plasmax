@@ -3,19 +3,16 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import matplotlib.backends.backend_pgf as backend_pgf
-
-if not hasattr(backend_pgf, "common_texification") and hasattr(backend_pgf, "_tex_escape"):
-    backend_pgf.common_texification = backend_pgf._tex_escape
-from tikzplotlib import save
+from .utils import save_fig
 
 from .config import Grid
 from .sim import run_time_loop
+from .source import maxwell_distrib
 
 jax.config.update("jax_enable_x64", True)
 
 
-def plot_time_error(cfg, src=None, format="png"):
+def plot_time_error(cfg, src=None):
     dt_backup = cfg.time.dt
     dt_ref = jnp.float32(jnp.log2(cfg.time.dt))
     if dt_ref - jnp.ceil(dt_ref) != 0:
@@ -57,7 +54,7 @@ def plot_time_error(cfg, src=None, format="png"):
     ax.loglog(dts, errors_dts, "x-")
     ax.loglog(dts, jnp.exp(C_dt) * dts**p_dt, "--", label=fr"fit: $O(\Delta t^{{{p_dt:.2f}}})$")
 
-    ax.set_xlabel("time step Δt")
+    ax.set_xlabel(r"time step $\Delta t$")
     ax.set_ylabel("L2 error")
     ax.set_title(f"Errors in time for ({cfg.inicond.case}) (Kn = {cfg.physics.knudsen:.0e})")
 
@@ -68,26 +65,22 @@ def plot_time_error(cfg, src=None, format="png"):
     ax.legend()
     ax.grid(True, which="both")
 
-    folder = Path("plots/errors")
+    folder = Path("error_estimation")
     folder.mkdir(parents=True, exist_ok=True)
 
-    if format == "png":
-        fig.savefig(folder / f"time_error-Kn_{cfg.physics.knudsen:.0e}.png")
-    elif format == "tex":
-        save(folder / f"time_error-Kn_{cfg.physics.knudsen:.0e}.tex", encoding="utf-8")
+    save_fig(folder / f"time_error-Kn_{cfg.physics.knudsen:.0e}.png", fig)
     plt.close(fig)
 
     cfg.time.dt = dt_backup
 
 
-def plot_space_error(cfg, src=None, format="png"):
+def plot_space_error(cfg, src=None):
     if cfg.grid.nx != cfg.grid.nv:
         raise ValueError("Invalid space step: dx and dv must be equal")
 
     nxv_backup = cfg.grid.nx
     lx_backup = cfg.grid.lx
     lv_backup = cfg.grid.lv
-    k_backup = cfg.grid.k
     nxv_ref = jnp.float32(jnp.log2(cfg.grid.nx))
     if nxv_ref - jnp.floor(nxv_ref) != 0:
         raise ValueError("Invalid space step: dx and dx must be a power of 2")
@@ -105,7 +98,7 @@ def plot_space_error(cfg, src=None, format="png"):
     powers_nxvs = jnp.arange(nxv_ref-1, 3, -1)
     for power in powers_nxvs:
         step = 2 ** power
-        cfg.grid = Grid(step, step, lx_backup, lv_backup, k=k_backup)
+        cfg.grid = Grid(step, step, lx_backup, lv_backup)
 
         f, _ = run_time_loop(cfg, src=src)
         f = f[-1, :, :]
@@ -142,16 +135,13 @@ def plot_space_error(cfg, src=None, format="png"):
     ax.legend()
     ax.grid(True, which="both")
 
-    folder = Path("plots/errors")
+    folder = Path("error_estimation")
     folder.mkdir(parents=True, exist_ok=True)
 
-    if format == "png":
-        fig.savefig(folder / f"space_error-Kn_{cfg.physics.knudsen:.0e}.png")
-    elif format == "tex":
-        save(folder / f"space_error-Kn_{cfg.physics.knudsen:.0e}.tex", encoding="utf-8")
+    save_fig(folder / f"space_error-Kn_{cfg.physics.knudsen:.0e}.png", fig)
     plt.close(fig)
 
-    cfg.grid = Grid(nxv_backup, nxv_backup, lx_backup, lv_backup, k=k_backup)
+    cfg.grid = Grid(nxv_backup, nxv_backup, lx_backup, lv_backup)
 
 
 def plot_errors(cfg):
@@ -160,5 +150,5 @@ def plot_errors(cfg):
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
 
-    plot_time_error(cfg, format="png")
-    plot_space_error(cfg, format="png")
+    plot_time_error(cfg, src=maxwell_distrib, format="png")
+    plot_space_error(cfg, src=maxwell_distrib, format="png")

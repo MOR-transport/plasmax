@@ -39,13 +39,13 @@ def step(f: jnp.ndarray, cfg, t: float, src=None) -> tuple[jnp.ndarray, jnp.ndar
                              "(expected predcorr or nufi).")
 
 
-def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
+def run_time_loop(cfg, src=None, inicond=None, disabled_save=False, format="png", nb_profile=0,
                   verbose=True) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     """Advance ``f`` until ``time >= cfg.time.tend`` or ``nt_max`` steps."""
     grid = cfg.grid
 
     # f and t initialization
-    if cfg.io.restart.enabled and cfg.io.restart.file:
+    if cfg.io.restart.enabled and cfg.io.restart.file and not disabled_save:
         restart_path = Path(cfg.io.restart.file)
         if not restart_path.exists():
             raise FileNotFoundError(f"Restart file '{restart_path}' not found.")
@@ -76,20 +76,6 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
     rho = compute_density(f, grid.dv)
     Efield = vpoisson(rho, grid, cfg.physics.charge)
 
-    if cfg.time.plot_freq > 0:
-        folder = Path("plots/simulation/sim_default")
-        folder_f = folder / "iterations/solution"
-        folder_E = folder / "iterations/Efield"
-
-        if folder.exists() and folder.is_dir():
-            shutil.rmtree(folder)
-
-        folder_f.mkdir(parents=True)
-        folder_E.mkdir(parents=True)
-
-        plot_inicond(cfg, f, folder_f / f"solution_{0:04d}.{format}")
-        plot_Efield(cfg, Efield, t, folder_E / f"Efield_{0:04d}.{format}")
-
     # Number of iterations from the initial time
     remaining = max(0.0, cfg.time.tend - t)
     nt_cap = min(cfg.time.nt_max, int(math.ceil(remaining / cfg.time.dt)))
@@ -99,10 +85,11 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
 
     tcpu = []
 
-    if nb_profile > 0:
-        fig, axs = plt.subplots(2, 1, figsize=(16, 10))
-
     cfg.paths.plot_dir.mkdir(parents=True, exist_ok=True)
+
+    if cfg.time.plot_freq > 0:
+        plot_inicond(cfg, f, str(cfg.paths.plot_dir / f"solution_{0:04d}.{format}"))
+        plot_Efield(cfg, Efield, t, str(cfg.paths.plot_dir / f"Efield_{0:04d}.{format}"))
 
     f_hist = jnp.empty((nt_cap+1, grid.nv, grid.nx), dtype=jnp.float64)
     f_hist = f_hist.at[0, :, :].set(f)
@@ -111,7 +98,7 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
     Efield_hist = Efield_hist.at[0, :].set(Efield)
 
     global_it = it_offset
-    if global_it == 0:
+    if global_it == 0 and not disabled_save:
         measure(cfg, f, Efield, global_it, t)
     for it in range(1, nt_cap + 1):
 
@@ -124,7 +111,8 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
         f_hist = f_hist.at[it, :, :].set(f)
         Efield_hist = Efield_hist.at[it, :].set(Efield)
 
-        measure(cfg, f, Efield, global_it, t)
+        if not disabled_save:
+            measure(cfg, f, Efield, global_it, t)
 
         if verbose:
             print(f"iter: {it:3d}, time: {t:4.1f}, dt: {cfg.time.dt:.2f}, "
@@ -134,9 +122,6 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
                           str(cfg.paths.plot_dir / f"solution_{it:04d}.{format}"))
             plot_Efield(cfg, Efield, t,
                         str(cfg.paths.plot_dir / f"Efield_{it:04d}.{format}"))
-        if nb_profile > 0:
-            if cfg.time.plot_freq > 0 and it % ((nt_cap-2) // nb_profile) == 0:
-                plot_profile(cfg, f, t, axs)
         if t >= cfg.time.tend - 1e-15:
             break
     else:
@@ -151,16 +136,12 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
             flush=True,
         )
 
-    if nb_profile > 0:
-        axs[0].legend()
-        axs[1].legend()
-        fig.savefig(cfg.paths.plot_dir / "profile.png")
-
-    # Save final distribution function and time to an .npz archive
-    save_path = cfg.paths.data_dir / "f_final.npz"
-    save_path.parent.mkdir(parents=True, exist_ok=True)
-    jnp.savez(save_path, f=f, t=t, it=global_it)
-    print(f"Save state (f,t,it) to {save_path}")
+    if not disabled_save:
+        # Save final distribution function and time to an .npz archive
+        save_path = cfg.paths.data_dir / "f_final.npz"
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        jnp.savez(save_path, f=f, t=t, it=global_it)
+        print(f"Save state (f,t,it) to {save_path}")
 
     return f_hist, Efield_hist
 

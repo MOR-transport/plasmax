@@ -25,10 +25,21 @@ def maxwell_distrib(cfg: Config, f: jnp.ndarray) -> jnp.ndarray:
     return (MF - f) / cfg.physics.knudsen
 
 
-def gaussian_xv(cfg, a=5):
+def gaussian_v(cfg, a=2):
     v_col = cfg.grid.v[:, None]
-    res = (1 / (2*jnp.pi)) * jnp.exp((-v_col**2) / 2*a)
+    res = jnp.exp((-v_col**2) / (2*a) )
     return jnp.broadcast_to(res, (cfg.grid.nv, cfg.grid.nx))[None, :, :]
+
+
+def gaussian_x(cfg, a=500, b=30):
+    x_row = cfg.grid.x[None, :]
+    res = jnp.exp((-(x_row-b)**2) / (2*a))
+    return jnp.broadcast_to(res, (cfg.grid.nv, cfg.grid.nx))[None, :, :]
+
+
+def gate_x(cfg, a=15, b=40):
+    x_row = cfg.grid.x[None, :]
+    return jnp.float64((a <= x_row) & (x_row <= b))[None, :, :]
 
 
 def disk_xv(cfg, a=6, b=0, c=1):
@@ -37,13 +48,13 @@ def disk_xv(cfg, a=6, b=0, c=1):
     return jnp.float64((x_row-a)**2 + (v_col-b)**2 <= c**2)[None, :, :]
 
 
-def tanh_t(cfg, t_star=0.6):
+def tanh_t(cfg, t_star=0.8):
     Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
     t = jnp.linspace(0, cfg.time.tend, Nt)
-    return 0.5 + 0.5 * jnp.tanh(t - t_star)[:, None, None]
+    return  0.5 + 0.5 * jnp.tanh(10 * (t - t_star))[:, None, None]
 
 
-def gate_t(cfg, a=0.2, b=0.5):
+def gate_t(cfg, a=0.8, b=1):
     Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
     t = jnp.linspace(0, cfg.time.tend, Nt)
     return jnp.float64((a <= t) & (t <= b))[:, None, None]
@@ -60,9 +71,11 @@ def compute_src(cfg, f_hist, fexp):
 
 def get_filters_exp(cfg):
     filter_xv_dic = {
-        "gaussian_xv": gaussian_xv,
+        "gaussian_x": gaussian_x,
+        "gaussian_v": gaussian_v,
         "disk_xv": disk_xv,
         "ones": ones,
+        "gate_x": gate_x,
     }
     filter_t_dic = {
         "tanh_t": tanh_t,
