@@ -69,19 +69,22 @@ def plot_progress(cfg, losses, inicond, f_hist, f_exp, fname):
     plt.close(fig)
 
 
-def plot_all(data_folder=folder):
-    cfg = load_config("params/landau_damping.yaml")
+def plot_all(params_file="params/landau_damping.yaml", data_folder=folder, nskip=10):
+    cfg = load_config(params_file)
     cfg.time.plot_freq = 0
 
     f_exp = generate_target(cfg)
 
-    files = sorted(data_folder.glob("data_*.npz"))
+    # JIT the forward pass once; reused for every snapshot
+    forward = jax.jit(lambda inicond: run_time_loop(cfg, inicond=inicond, disabled_save=True, verbose=False)[0])
+
+    files = sorted(data_folder.glob("data_*.npz"))[::nskip]
     print(f"Plotting {len(files)} snapshots …", flush=True)
     for path in files:
         data = np.load(path)
         inicond = jnp.array(data["inicond"], dtype=jnp.float64)
         losses = list(data["losses"])
-        f_hist, _ = run_time_loop(cfg, inicond=inicond, verbose=False)
+        f_hist = forward(inicond)
         it = int(path.stem.split("_")[1])
         plot_progress(cfg, losses, inicond, f_hist, f_exp,
                       data_folder / f"plot_{it:04d}.png")
@@ -96,7 +99,8 @@ def generate_target(cfg):
     """Forward run with the experimental initial condition."""
     inicond_exp = get_inicond_exp(cfg)(cfg.grid.X, cfg.grid.V)
     print("Running target simulation …", flush=True)
-    f_exp, _ = run_time_loop(cfg, inicond=inicond_exp, verbose=False)
+    f_exp, _ = run_time_loop(cfg, inicond=inicond_exp, disabled_save=True, verbose=False)
+    print("Target simulation done", flush=True)
     return f_exp
 
 
@@ -104,7 +108,7 @@ def make_loss(cfg, f_exp):
     """J(f0): run the simulation and compare to the target trajectory."""
 
     def loss(inicond):
-        f_hist, _ = run_time_loop(cfg, inicond=inicond, auto_grad=True, verbose=False)
+        f_hist, _ = run_time_loop(cfg, inicond=inicond, disabled_save=True, verbose=False)
         return functionnal(cfg, f_hist, f_exp)
 
     return loss
@@ -142,11 +146,12 @@ def make_callback(cache):
     return on_step
 
 
-def main():
-    cfg = load_config("params/landau_damping.yaml")
+def main(params_file="params/landau_damping.yaml"):
+    cfg = load_config(params_file)
     cfg.time.plot_freq = 0
 
     f_exp = generate_target(cfg)
+    
     inicond0 = jnp.exp(-cfg.grid.V**2 / 2) / jnp.sqrt(2 * jnp.pi)
     shape = inicond0.shape
 
