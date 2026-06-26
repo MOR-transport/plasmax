@@ -2,6 +2,7 @@ import math
 from pathlib import Path
 
 import jax.numpy as jnp
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
@@ -246,3 +247,109 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
         plt.close(fig)
     else:
         plt.show()
+
+def plot_inr_benchmark_comparison(f_sim, f_net, grid_X, grid_V, t, arch_name, save_dir):
+    """ 
+    Plots f_sim, f_net and the difference side by side
+    """
+    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+    
+    diff = f_sim - f_net 
+    vmax = max(np.max(f_sim), np.max(f_net))
+    vmin = min(np.min(f_sim), np.min(f_net))
+    
+    abs_max_diff = np.max(np.abs(diff))
+    
+    #exact matrix (simulation)
+    im0 = axs[0].pcolormesh(grid_X, grid_V, f_sim, cmap='viridis', shading="auto", vmin=vmin, vmax=vmax)
+    axs[0].set_title(f'Exact Simulation (t={t:.1f})')
+    axs[0].set_xlabel('x')
+    axs[0].set_ylabel('v')
+    fig.colorbar(im0, ax=axs[0])
+    
+    #Network prediction
+    im1 = axs[1].pcolormesh(grid_X, grid_V, f_net, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
+    axs[1].set_title(f'INR Network ({arch_name})')
+    axs[1].set_xlabel('x')
+    fig.colorbar(im1, ax=axs[1])
+    
+    #Difference
+    im2 = axs[2].pcolormesh(grid_X, grid_V, diff, cmap='coolwarm', shading='auto', vmin=-abs_max_diff, vmax=abs_max_diff)
+    axs[2].set_title('Error (f_sim - f_network)')
+    axs[2].set_xlabel('x')
+    fig.colorbar(im2, ax=axs[2])
+    
+    plt.tight_layout()
+    
+    save_path = Path(save_dir) / f'comparison_t{t:.1f}_{arch_name}.png'
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+def plot_loss_history(loss_history, t, arch_name, save_dir):
+    """Plots the evolution of MSE (in logarithmic scale)"""
+    plt.figure(figsize=(8, 6))
+    plt.plot(loss_history, label=arch_name, color='blue', linewidth=2)
+    plt.yscale('log')
+    plt.xlabel('Iterations')
+    plt.ylabel('MSE Loss')
+    plt.title(f'Convergence of {arch_name} network at t={t:.1f}')
+    plt.grid(True, which="both", ls="--", alpha=0.5)
+    plt.legend()
+    
+    save_path = Path(save_dir) / f'loss_t{t:.1f}_{arch_name}.png'
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+def plot_pod_benchmark_comparison(f_sim, f_pod, grid_X, grid_V, t, rank, save_dir):
+    """
+    Plots a 3-panel comparison (Exact, POD Reconstructed, Signed Error)
+    at a specific checkpoint time t, PERFECTLY matching the INR layout and colors.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from pathlib import Path
+
+    # conversion en numpy si jamais ce sont des jax.array
+    f_sim_np = np.array(f_sim)
+    f_pod_np = np.array(f_pod)
+    
+    # 1. Calcul de l'erreur signée (comme pour l'INR)
+    diff = f_sim_np - f_pod_np
+    
+    # 2. Bornes identiques pour les deux premiers panneaux
+    vmax = max(np.max(f_sim_np), np.max(f_pod_np))
+    vmin = min(np.min(f_sim_np), np.min(f_pod_np))
+    
+    # 3. Borne symétrique centrée sur 0 pour la carte d'erreur
+    abs_max_diff = np.max(np.abs(diff))
+    if abs_max_diff == 0:  # Évite une division par zéro ou échelle nulle si erreur parfaite
+        abs_max_diff = 1e-5
+    
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    
+    # Panneau 1 : Simulation Exacte (Viridis)
+    im0 = axes[0].pcolormesh(grid_X, grid_V, f_sim_np, cmap='viridis', shading="auto", vmin=vmin, vmax=vmax)
+    axes[0].set_title(f"Exact Simulation ($t={t:.1f}$)", fontsize=12)
+    axes[0].set_xlabel("x")
+    axes[0].set_ylabel("v")
+    fig.colorbar(im0, ax=axes[0])
+    
+    # Panneau 2 : Reconstruction POD (Viridis)
+    im1 = axes[1].pcolormesh(grid_X, grid_V, f_pod_np, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
+    axes[1].set_title(f"POD Reconstruction (r={rank})", fontsize=12)
+    axes[1].set_xlabel("x")
+    fig.colorbar(im1, ax=axes[1])
+    
+    # Panneau 3 : Carte d'Erreur Signée (Coolwarm centré en 0)
+    im2 = axes[2].pcolormesh(grid_X, grid_V, diff, cmap='coolwarm', shading='auto', vmin=-abs_max_diff, vmax=abs_max_diff)
+    axes[2].set_title("Error (f_sim - f_pod)", fontsize=12)
+    axes[2].set_xlabel("x")
+    fig.colorbar(im2, ax=axes[2])
+    
+    plt.tight_layout()
+    
+    # Formatage rigoureux du chemin et sauvegarde
+    save_path = Path(save_dir) / f"comparison_t{t:.1f}_r{rank}.png"
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"   [Benchmark] Saved POD plot to {save_path.name}")    

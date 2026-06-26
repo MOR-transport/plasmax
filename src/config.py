@@ -101,8 +101,12 @@ class Paths:
     data_dir: Path
 
     @classmethod
-    def from_case(cls, testcase: str, save_dir: str | Path | None = None) -> Paths:
-        save = Path(save_dir) if save_dir is not None else Path("results") / testcase
+    def from_case(cls, case: str, save_dir: str | Path | None = None) -> Paths:
+        if save_dir is not None:
+            save = Path(save_dir)
+        else:
+            save = Path("results") / f"case_{case}" / "baseline"
+        
         return cls(save_dir=save, plot_dir=save / "plots", data_dir=save / "data")
 
 
