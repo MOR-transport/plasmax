@@ -549,7 +549,7 @@ def plot_combined_svd_spectrum_full(data_dir: Path, plot_dir: Path, fmt: str, ca
     ax.legend(loc='upper right', fontsize=14, frameon=True, edgecolor='black', framealpha=1.0, ncol=2)
     fig.tight_layout()
 
-    output_path = plot_dir / f"svd_spectrum_full_{case_name}"
+    output_path = plot_dir / f"svd_spectrum_full_combined_{case_name}"
     plt.savefig(output_path.with_suffix(f".{fmt}"), dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f"-> Full spectrum figure saved at {output_path}.{fmt}")
