@@ -472,6 +472,88 @@ def plot_combined_svd_spectrum(data_dir: Path, plot_dir: Path, fmt: str, case_na
     plt.close(fig)
     print(f"-> Combined spectrum figure saved at {output_path}.{fmt}")
 
+
+def plot_combined_svd_spectrum_full(data_dir: Path, plot_dir: Path, fmt: str, case_name: str):
+    """
+    Plots every available SVD spectrum from the first segmented stop time to the final one.
+    """
+    spectrum_dir = data_dir / "svd_spectrums"
+    spectrum_files = []
+
+    for spectrum_file in spectrum_dir.glob("spectrum_t*.csv"):
+        stem = spectrum_file.stem
+        try:
+            time_value = float(stem.replace("spectrum_t", ""))
+        except ValueError:
+            continue
+        spectrum_files.append((time_value, spectrum_file))
+
+    if not spectrum_files:
+        print(f"Warning: No spectrum files found in {spectrum_dir}")
+        return
+
+    spectrum_files.sort(key=lambda item: item[0])
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    cmap = plt.cm.viridis
+    n_files = len(spectrum_files)
+
+    for idx, (time_value, spectrum_file) in enumerate(spectrum_files):
+        data = np.genfromtxt(spectrum_file, delimiter=",", skip_header=1)
+        if data.ndim == 1:
+            data = data.reshape(1, -1)
+
+        color = cmap(idx / max(n_files - 1, 1))
+        ax.semilogy(
+            data[:, 0],
+            data[:, 1],
+            color=color,
+            linestyle="-",
+            linewidth=2.2,
+            marker="o",
+            markersize=4.5,
+            alpha=0.9,
+            label=fr"$t = {time_value:.1f}$",
+        )
+
+    rank_candidates = [32, 8, 2]
+    color_mapping = {32: '#adad00', 8: '#ff7f0e', 2: '#d62728'}
+
+    detected_rank = None
+    for r in rank_candidates:
+        if f"r{r}" in case_name.lower() or f"_{r}" in case_name.lower():
+            detected_rank = r
+            break
+
+    if detected_rank is not None:
+        ax.axvline(
+            x=detected_rank,
+            color=color_mapping[detected_rank],
+            linestyle='--',
+            linewidth=2.5,
+            alpha=0.9,
+            label=f'Truncation rank $r={detected_rank}$'
+        )
+    else:
+        print(f"Note: No explicit rank detected in case name '{case_name}', skipping vertical line.")
+
+    ax.set_xlabel(r'Singular Value Index $i$', fontsize=20, labelpad=10)
+    ax.set_ylabel(r'$\sigma_i / \sigma_1$', fontsize=20, labelpad=12)
+    ax.set_title(f'SVD Spectrum Decay ({case_name.upper()})', fontsize=22, pad=15)
+
+    ax.tick_params(axis='both', which='major', labelsize=16)
+    ax.tick_params(axis='both', which='minor', labelsize=12)
+    ax.grid(True, which='major', linestyle='-', alpha=0.6)
+    ax.grid(True, which='minor', linestyle=':', alpha=0.3)
+
+    ax.legend(loc='upper right', fontsize=14, frameon=True, edgecolor='black', framealpha=1.0, ncol=2)
+    fig.tight_layout()
+
+    output_path = plot_dir / f"svd_spectrum_full_{case_name}"
+    plt.savefig(output_path.with_suffix(f".{fmt}"), dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"-> Full spectrum figure saved at {output_path}.{fmt}")
+
 def main():
     parser = argparse.ArgumentParser(description="Generate plots from diagnostics.csv")
     parser.add_argument("--params", type=str, nargs="+", required=True, help="Path(s) to YAML params file(s)")
@@ -487,7 +569,8 @@ def main():
     parser.add_argument("--frob-inr", action = "store_true", help="Plot only the Frobenius error of INR (all architectures)")
     parser.add_argument("--inr-loss", action="store_true", help="Plot the INR final loss per segment and per architecture")
     parser.add_argument("--cpu-time", action="store_true", help="Plot Stacked CPU times")
-    parser.add_argument("--svd-spectrum", action="store_true", help="Plot the combined SVD spectrum decay (t=5 vs t=30)")
+    parser.add_argument("--svd-spectrum-t5-t30", action="store_true", help="Plot the combined SVD spectrum decay (t=5 vs t=30)")
+    parser.add_argument("--svd-spectrum-full", action="store_true", help="Plot the SVD spectrum decay from dt_seg to dt_end")
     parser.add_argument("--all", action="store_true", help="Generate all plots (default if no specific flags)")
     parser.add_argument("--format", choices=["png", "tex", "both"], default="both", help="Output format (default: both)")
     parser.add_argument("--output-dir", type=str, default=None, help="Override output directory")
@@ -495,7 +578,7 @@ def main():
     args = parser.parse_args()
 
     if not any((args.epot, args.ekin, args.etot, args.mass, args.momentum,
-                args.l2norm, args.frob, args.frob_pod, args.frob_inr, args.inr_loss, args.cpu_time, args.svd_spectrum)):
+            args.l2norm, args.frob, args.frob_pod, args.frob_inr, args.inr_loss, args.cpu_time, args.svd_spectrum_t5_t30, args.svd_spectrum_full)):
         args.all = True
 
     quantities = []
@@ -682,7 +765,7 @@ def main():
         plot_cpu_time(cases_data, figure_dir, args.format)
      
     #SVD spectrum    
-    if args.all or args.svd_spectrum:
+    if args.all or args.svd_spectrum_t5_t30:
         for case in cases_data:
             data_dir = case["csv_path"].parent
             spectrum_dir = data_dir / "svd_spectrums"
@@ -690,6 +773,15 @@ def main():
             if spectrum_dir.exists():
                 print(f"\nGenerating combined SVD spectrum plot for configuration: {case['name']}...")
                 plot_combined_svd_spectrum(data_dir, figure_dir, args.format, case_name=case["name"])
+
+    if args.all or args.svd_spectrum_full:
+        for case in cases_data:
+            data_dir = case["csv_path"].parent
+            spectrum_dir = data_dir / "svd_spectrums"
+
+            if spectrum_dir.exists():
+                print(f"\nGenerating full SVD spectrum plot for configuration: {case['name']}...")
+                plot_combined_svd_spectrum_full(data_dir, figure_dir, args.format, case_name=case["name"])
  
     print(f"\nPlots saved to {figure_dir}.")
 
