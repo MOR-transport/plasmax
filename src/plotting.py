@@ -261,14 +261,14 @@ def plot_inr_benchmark_comparison(f_sim, f_net, grid_X, grid_V, t, arch_name, sa
     abs_max_diff = np.max(np.abs(diff))
     
     #exact matrix (simulation)
-    im0 = axs[0].pcolormesh(grid_X, grid_V, f_sim, cmap='viridis', shading="auto", vmin=vmin, vmax=vmax)
+    im0 = axs[0].pcolormesh(grid_X, grid_V, f_sim, cmap='turbo', shading="auto", vmin=vmin, vmax=vmax)
     axs[0].set_title(f'Exact Simulation (t={t:.1f})')
     axs[0].set_xlabel('x')
     axs[0].set_ylabel('v')
     fig.colorbar(im0, ax=axs[0])
     
     #Network prediction
-    im1 = axs[1].pcolormesh(grid_X, grid_V, f_net, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
+    im1 = axs[1].pcolormesh(grid_X, grid_V, f_net, cmap='turbo', shading='auto', vmin=vmin, vmax=vmax)
     axs[1].set_title(f'INR Network ({arch_name})')
     axs[1].set_xlabel('x')
     fig.colorbar(im1, ax=axs[1])
@@ -328,14 +328,14 @@ def plot_pod_benchmark_comparison(f_sim, f_pod, grid_X, grid_V, t, rank, save_di
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
     
     # Panneau 1 : Simulation Exacte (Viridis)
-    im0 = axes[0].pcolormesh(grid_X, grid_V, f_sim_np, cmap='viridis', shading="auto", vmin=vmin, vmax=vmax)
+    im0 = axes[0].pcolormesh(grid_X, grid_V, f_sim_np, cmap='turbo', shading="auto", vmin=vmin, vmax=vmax)
     axes[0].set_title(f"Exact Simulation ($t={t:.1f}$)", fontsize=12)
     axes[0].set_xlabel("x")
     axes[0].set_ylabel("v")
     fig.colorbar(im0, ax=axes[0])
     
     # Panneau 2 : Reconstruction POD (Viridis)
-    im1 = axes[1].pcolormesh(grid_X, grid_V, f_pod_np, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
+    im1 = axes[1].pcolormesh(grid_X, grid_V, f_pod_np, cmap='turbo', shading='auto', vmin=vmin, vmax=vmax)
     axes[1].set_title(f"POD Reconstruction (r={rank})", fontsize=12)
     axes[1].set_xlabel("x")
     fig.colorbar(im1, ax=axes[1])

@@ -49,15 +49,28 @@ def compress_pod(f: jnp.ndarray, rank: int, current_time: float, plot_dir: Path,
     #plot of the normalized singular spectrum
     s_norm = s / s[0]
     
+    spectrum_dir = data_dir / "svd_spectrums"
+    spectrum_dir.mkdir(parents=True, exist_ok=True)
+    spectrum_file = spectrum_dir / f"spectrum_t{current_time:05.2f}.csv"
+    
+    with open(spectrum_file, "w") as f_spec:
+        f_spec.write("index,sigma_norm\n")
+        for idx, val in enumerate(s_norm):
+            f_spec.write(f"{idx},{float(val):.12e}\n")
+    
     fig, ax = plt.subplots(figsize=(8, 6))    
-    ax.semilogy(s_norm, marker='o', linestyle='', color='#1f77b4', markersize=5, alpha=0.8, label=r"Normalized $\sigma_i$")    
-    ax.axvline(x=rank, color='#d62728', linestyle='--', linewidth=2, label=f'Truncation $r={rank}$')    
-    ax.set_xlabel(r'Singular Value Index $i$', fontsize=14, labelpad=10)
-    ax.set_ylabel(r'$\sigma_i / \sigma_1$', fontsize=14, labelpad=10)
-    ax.set_title(f'Normalized SVD Spectrum at $t={current_time:.2f}$', fontsize=16, pad=15)    
-    ax.grid(True, which='major', linestyle='-', alpha=0.5)
-    ax.grid(True, which='minor', linestyle=':', alpha=0.2)
-    ax.legend(loc='upper right', fontsize=12, frameon=True, edgecolor='black', fancybox=False, facecolor='white', framealpha=1.0)
+    ax.semilogy(s_norm, marker='o', linestyle='-', color='#1f77b4', markersize=6, linewidth=1.5, label=r"Spectrum $\sigma_i / \sigma_1$")    
+    ax.axvline(x=rank, color='#d62728', linestyle='--', linewidth=2.5, label=f'Truncation $r={rank}$') 
+    
+    ax.set_xlabel(r'Singular Value Index $i$', fontsize=18, labelpad=10)
+    ax.set_ylabel(r'$\sigma_i / \sigma_1$', fontsize=18, labelpad=10)
+    ax.set_title(f'SVD Spectrum Decay at $t={current_time:.1f}$', fontsize=20, pad=15)    
+    
+    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax.grid(True, which='major', linestyle='-', alpha=0.6)
+    ax.grid(True, which='minor', linestyle=':', alpha=0.3)
+    ax.legend(loc='upper right', fontsize=14, frameon=True, edgecolor='black', framealpha=1.0)
+    
     fig.tight_layout()
     fig.savefig(plot_dir / f"svd_spectrum_t{current_time:05.2f}.png", dpi=300, bbox_inches='tight')
     plt.close(fig)
@@ -344,7 +357,9 @@ def compress_inr(
         loss_dict, model, lbfgs_opt = lbfgs_opt.update(model, full_batch)
         loss_val = float(loss_dict["total"])
         loss_history.append(loss_val)
-        print(f" [L-BFGS] iter {i:4d} - loss: {loss_val:.2e}")
+        
+        if i % 10 == 0 or i == lbfgs_iters - 1:
+                print(f" [Pure L-BFGS] iter {i:3d} - loss: {loss_val:.2e}")
         
         if loss_val < threshold:
             print(f" [L-BFGS] Perfect convergence achieved")
@@ -356,6 +371,114 @@ def compress_inr(
     
     frob_error = float(jnp.linalg.norm(f_comp - f_full) / jnp.linalg.norm(f_full))
     
+    t1 = time.perf_counter()
+    comp_time = t1 - t0
+    
+    print(f"[INR/{arch}] Final Loss: {loss_val:.2e} | Frobenius Error: {frob_error:.2e}\n")
+    print(f"[INR/{arch}] Sim Time: {sim_time:.2f}s | Comp Time: {comp_time:.2f}s\n")
+    
+    log_inr_error(data_dir, arch, current_time, loss_val, frob_error, sim_time, comp_time)
+    
+    return f_comp, model, jnp.array(loss_history)
+
+def compress_inr_2(
+    f_full: jnp.ndarray,
+    grid_X: jnp.ndarray,
+    grid_V: jnp.ndarray,
+    lx: float,
+    lv: float,
+    current_time: float,
+    data_dir: Path,
+    arch: str = "periodic_mlp_64",
+    params_init: Any = None,
+    lr: float = 1e-3,
+    max_iters: int = 2000,
+    batch_size: int = 2000,
+    threshold: float = 1e-8,
+    lbfgs_iters: int = 50,
+    sim_time: float = 0.0
+):
+    """
+    Fit an INR network to approximate f_full.
+    Uses ADAM + L-BFGS for the first segment (t=5), 
+    and switches to Pure L-BFGS for subsequent segments (t > 5) to leverage warm-starting.
+    """
+    t0 = time.perf_counter()
+    
+    x_raw = grid_X.flatten() / lx
+    v_norm = grid_V.flatten() / lv
+    
+    inputs = jnp.stack([x_raw, v_norm], axis=-1)
+    targets = f_full.flatten()[:, None]
+    total_points = inputs.shape[0]
+    
+    key = jax.random.PRNGKey(42)
+    
+    if params_init is None:
+        key, subkey = jax.random.split(key)
+        model = get_inr_model(arch, subkey)
+    else:
+        model = params_init
+        
+    loss_history = []
+    loss_val = jnp.inf 
+    
+    # L-BFGS for t > 5 (Bypassing ADAM)
+    if current_time > 5.0:
+        print(f"\n[INR/{arch}] --- Phase Pure L-BFGS (t={current_time:.2f} | Bypassing ADAM) ---")
+        full_batch = (inputs, targets)
+        lbfgs_opt = ScimbaLBfgs(model, losses_function, grad_loss_function)
+        lbfgs_iters = lbfgs_iters * 2  
+        
+        for i in range(lbfgs_iters):
+            loss_dict, model, lbfgs_opt = lbfgs_opt.update(model, full_batch)
+            loss_val = float(loss_dict["total"])
+            loss_history.append(loss_val)
+            
+            if i % 10 == 0 or i == lbfgs_iters - 1:
+                print(f" [Pure L-BFGS] iter {i:3d} - loss: {loss_val:.2e}")
+            
+            if loss_val < threshold:
+                print(f" [Pure L-BFGS] Convergence achieved at iteration {i}")
+                break
+    # classic routine : ADAM + L-BFGS for the first segment t=5
+    else:
+        print(f"\n[INR/{arch}] --- Beginning Phase 1 : ADAM (t={current_time:.2f} | {max_iters} iters) ---")
+        adam_opt = ScimbaAdam(model, losses_function, grad_loss_function, learning_rate=lr)
+        
+        for i in range(max_iters):
+            key, subkey = jax.random.split(key)
+            batch_idx =jax.random.choice(subkey, total_points, shape=(batch_size,), replace=False)
+            batch = (inputs[batch_idx], targets[batch_idx])
+            
+            loss_dict, model, adam_opt = adam_opt.update(model, batch)
+            loss_val = float(loss_dict["total"])
+            loss_history.append(loss_val)
+            
+            if i % 100 == 0: 
+                print(f" [ADAM] iter {i:4d} - loss: {loss_val:.2e}")
+                if loss_val < threshold:
+                    print(f" [ADAM] Anticipated convergence at iteration {i}")
+                    break   
+        
+        print(f"\n[INR/{arch}] --- Beginning Phase 2 : L-BFGS (t={current_time:.2f}) ---")
+        full_batch = (inputs, targets)
+        lbfgs_opt = ScimbaLBfgs(model, losses_function, grad_loss_function)
+        
+        for i in range(lbfgs_iters):
+            loss_dict, model, lbfgs_opt = lbfgs_opt.update(model, full_batch)
+            loss_val = float(loss_dict["total"])
+            loss_history.append(loss_val)
+            print(f" [L-BFGS] iter {i:4d} - loss: {loss_val:.2e}")
+            
+            if loss_val < threshold:
+                print(f" [L-BFGS] Convergence achieved at iteration {i}")
+                break
+    
+    # evaluation and backup
+    f_comp_flat = jax.vmap(model)(inputs)
+    f_comp = f_comp_flat.reshape(f_full.shape)
+    frob_error = float(jnp.linalg.norm(f_comp - f_full) / jnp.linalg.norm(f_full))
     t1 = time.perf_counter()
     comp_time = t1 - t0
     
