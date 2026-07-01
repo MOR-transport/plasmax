@@ -7,7 +7,7 @@ This module introduces the ability to run PlasmaX simulations in segments and dy
 * **Segmented Runs:** Simulation stops and restarts automatically at intervals defined by `io.dt_save` in the `.yaml` config file.
 * **POD Compression:** Compresses the Vlasov distribution function $f(x,v)$ at each save point using SVD.
 * **INR Compression:** Compresses the data by training a neural network to learn the continuous representation of $f(x,v)$. Features curriculum learning ("warm-starting" weights between time segments) and a hybrid ADAM + L-BFGS optimization routine for high-precision convergence.
-* **Spectrum Analysis (POD):** Automatically computes the relative Frobenius error caused by truncation and saves the normalized singular value spectrum plot at each compression step.
+* **Spectrum Analysis (POD):** Automatically computes the relative Frobenius error caused by truncation and saves the normalized singular value spectrum plot at each compression step. The diagnostics CLI also provides `--svd-spectrum-t5-t30` for the classic two-time comparison and `--svd-spectrum-full` to plot every available spectrum from `dt_seg` to `dt_end`.
 * **Error & Convergence Tracking:** Stores the history of Frobenius errors and network losses in `.csv` files, allowing for direct multi-run error comparisons over time.
 * **Performance Profiling:** Tracks and logs the CPU time spent on physical simulation versus data compression/training, enabling direct computational cost benchmarking via stacked bar charts.
 
@@ -52,10 +52,22 @@ plasmax-diags \
            results/case_two_stream/segmented/POD/r8/data/diagnostics.csv \
            results/case_two_stream/segmented/POD/r32/data/diagnostics.csv \
   --etot --epot --mass --frob-pod --format png
+```
+
+#### B. SVD Spectrum Evolution
+
+Compare the singular value decay at the first and last restart times, or across the full segmented simulation:
+
+```bash
+plasmax-diags \
+  --params results/case_two_stream/segmented/POD/r32/data/diagnostics.csv \
+  --svd-spectrum-t5-t30 --svd-spectrum-full --format png
 
 ```
 
-#### B. Benchmarking INR Architectures
+`--svd-spectrum-t5-t30` reproduces the two-curve comparison at `t=5` and `t=30`, while `--svd-spectrum-full` overlays every saved spectrum from the first segment stop time to the end of the run.
+
+#### C. Benchmarking INR Architectures
 
 Compare the reconstruction accuracy, final losses, and CPU times across various neural network architectures (MLP, SIREN, Fourier MLP, and their periodic counterparts):
 
@@ -76,7 +88,7 @@ plasmax-diags \
 
 ```
 
-#### C. Cross-Method Comparison (POD vs INR)
+#### D. Cross-Method Comparison (POD vs INR)
 
 Evaluate the global Frobenius error and computational cost between classical SVD and specific neural representations:
 

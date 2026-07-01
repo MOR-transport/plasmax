@@ -7,8 +7,8 @@ import time
 from pathlib import Path 
 from .config import load_config, Paths 
 from .sim import run_time_loop 
-from .compression import compress_inr, compress_pod, AVAILABLE_INR_ARCHS
-from .plotting import plot_inr_benchmark_comparison, plot_loss_history
+from .compression import compress_inr, compress_inr_2, compress_pod, AVAILABLE_INR_ARCHS
+from .plotting import plot_inr_benchmark_comparison, plot_loss_history, plot_pod_benchmark_comparison
 
 jax.config.update("jax_enable_x64", True)
 
@@ -87,6 +87,23 @@ def main():
         if compression == "POD":
             print(f"\n[POD] Applying compression (rank={args.rank}) to saved state...")
             f_comp = compress_pod(f_full, args.rank, current_time, plot_dir, cfg.paths.data_dir, sim_time)
+            benchmark_times = np.arange(dt_seg, final_time + (dt_seg/2), dt_seg)
+            
+            if any(np.isclose(current_time, bt, atol=1e-3) for bt in benchmark_times):
+                print(f"-> Benchmark recording for POD r{args.rank} at t={current_time}...")
+                #dedicated folder for pod benchmarks : comparisons/POD_benchmark/r_2, r_8, etc.
+                bench_dir = case_root / "comparisons" / "POD_benchmark" / f"r{args.rank}"
+                bench_dir.mkdir(parents=True, exist_ok=True)
+                
+                plot_pod_benchmark_comparison(
+                    f_sim = f_full,
+                    f_pod = f_comp,
+                    grid_X = cfg.grid.X,
+                    grid_V = cfg.grid.V,
+                    t = current_time,
+                    rank = args.rank,
+                    save_dir = bench_dir
+                )
             #overwrite the saved state with the compressed version
             jnp.savez(file_path, f=f_comp, t=t_saved, it=it_saved)
             print(f"[POD] Done\n")
@@ -106,7 +123,8 @@ def main():
                 data_dir=cfg.paths.data_dir,
                 arch=args.arch,
                 params_init=current_nn_params,
-                lr=dynamic_lr,
+                #lr=dynamic_lr,
+                lr=1e-3, 
                 lbfgs_iters=50,
                 sim_time=sim_time
             )
