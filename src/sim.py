@@ -161,6 +161,15 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
     save_path.parent.mkdir(parents=True, exist_ok=True)
     jnp.savez(save_path, f=f, t=t, it=global_it)
     print(f"Save state (f,t,it) to {save_path}")
+    
+    #--for data assimilation--- 
+    t_start = t - (nt_cap * cfg.time.dt)
+    t_grid = jnp.linspace(t_start, t, nt_cap + 1)
+    
+    # complete spatio-temporal history of the segment
+    history_path = cfg.paths.data_dir / f"history_t{t:05.2f}.npz"
+    jnp.savez(history_path, f_hist=f_hist, Efield_hist=Efield_hist, t_grid=t_grid)
+    print(f"Save segment history to {history_path.name}")
 
     return f_hist, Efield_hist
 

@@ -31,7 +31,8 @@ test = ["pytest"]
 plasmax-sim = "src.sim:simulate"
 plasmax-optim = "src.adjoint_method:main"
 plasmax-diags = "src.diagnostics.diags:main"
-plasmax-segmented ="src.run_segmented:main"
+plasmax-segmented ="src.compression.run_segmented:main"
+plasmax-pinn = "src.pinn.run_pinn:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]  

@@ -4,13 +4,14 @@ import jax
 import jax.numpy as jnp
 
 from scimba_jax.physical_models.abstract_physical_model import AbstractPhysicalModel
-from scimba_jax.physical_models.abstract_residuals import InteriorResidual, InitialResidual
+from scimba_jax.physical_models.abstract_residuals import InteriorResidual
 
 class VlasovResidual(InteriorResidual):
     """Physical residual for the 1D Vlasov equation"""
     def __init__(self, domain, time_domain):
         super().__init__(
             domain=domain,
+            time_domain=time_domain,
             size=1,
             model_type="t_x_v",
         )
@@ -20,6 +21,9 @@ class VlasovResidual(InteriorResidual):
         df_dt = f.d_t()
         df_dx = f.partial_derivative_x(0) #0 for the 1st spatial dimension
         df_dv = f.partial_derivative_v(0) #0 for the 1st velocity dimension
+        
+        if precomputed is None:
+            return df_dt + df_dx - df_dv
         
         #Recovery from precomputation_without_diff
         E = precomputed["E"]
@@ -57,6 +61,7 @@ class VlasovPoissonModel(AbstractPhysicalModel):
             E_val = self.E_interpolator(x_colloc, t_colloc)
             
             precomputed["E"] = E_val
+            precomputed["v"] = v_colloc
             
         return precomputed
             
