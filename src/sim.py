@@ -92,7 +92,7 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
 
     # Number of iterations from the initial time
     remaining = max(0.0, cfg.time.tend - t)
-    nt_cap = min(cfg.time.nt_max, int(math.ceil(remaining / cfg.time.dt)))
+    nt_cap = min(cfg.time.nt_max, int(round(remaining / cfg.time.dt)))
     if nt_cap <= 0:
         print("Nothing to simulate (tend already reached).")
         return jnp.empty((0, grid.nv, grid.nx)), jnp.empty((0, grid.nx))

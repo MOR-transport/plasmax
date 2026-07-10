@@ -10,6 +10,9 @@ from typing import Any
 #from functools import partial 
 from scimba_jax.nonlinear_approximation.networks.mlp import MLP
 from scimba_jax.nonlinear_approximation.optimizers.optimizers import ScimbaAdam, ScimbaLBfgs
+from scimba_jax.nonlinear_approximation.approximation_spaces.approximation_spaces import (
+    ApproximationSpace,
+)
 from jax.flatten_util import ravel_pytree
 
 jax.config.update("jax_enable_x64", True)
@@ -236,10 +239,10 @@ AVAILABLE_INR_ARCHS = [
 ] 
 
 def get_inr_model(arch: str, key: jax.Array) -> eqx.Module:
-    if arch == "mlp_16": return MLP(2, 1, [16]*3, "tanh", key)
-    elif arch == "mlp_64": return MLP(2, 1, [64]*3, "tanh", key)
-    elif arch == "mlp_128": return MLP(2, 1, [128]*3, "tanh", key)
-    elif arch == "deep_128": return MLP(2, 1, [128]*5, "tanh", key)
+    if arch == "mlp_16":    return MLP(in_size=2, out_size=1, hidden_sizes=[16]*3,  activation="tanh", key=key)
+    elif arch == "mlp_64":  return MLP(in_size=2, out_size=1, hidden_sizes=[64]*3,  activation="tanh", key=key)
+    elif arch == "mlp_128": return MLP(in_size=2, out_size=1, hidden_sizes=[128]*3, activation="tanh", key=key)
+    elif arch == "deep_128": return MLP(in_size=2, out_size=1, hidden_sizes=[128]*5, activation="tanh", key=key)
 
     elif arch == "siren": return SIRENScimbaINR(2, 1, [64]*3, 30.0, key)
     elif arch == "siren_128": return SIRENScimbaINR(2, 1, [128]*3, 30.0, key)
@@ -263,25 +266,13 @@ def get_inr_model(arch: str, key: jax.Array) -> eqx.Module:
     else:
         raise ValueError(f"Unknown Architecture : {arch}")    
 
-
-@jax.jit 
-def losses_function(model: eqx.Module, batch: tuple) -> dict:
-    """Calculate the MSE and returns the dictionary expected by scimba """
-    inputs, targets = batch
-    predictions = jax.vmap(model)(inputs)
-    mse = jnp.mean((predictions - targets) ** 2)
-    return {"total": mse}
-
 @jax.jit
-def grad_loss_function(model: eqx.Module, batch: tuple) -> jnp.ndarray:
-    """Calculate the gradient with respect to the model and flattens it into a 1D vectot"""
-    def loss_fn(m):
-        return losses_function(m, batch)["total"]
-
-    grads = eqx.filter_grad(loss_fn)(model) #eqx.filter_grad is the recommended way to derive an equinox model
-    # flattening gradients so that ScimbaLBfgs can use them
-    flat_grads, _ = ravel_pytree(grads)
-    return flat_grads 
+def losses_function(space, sample_dict: dict) -> dict:
+    """Calculate the MSE and returns the dictionary expected by scimba"""
+    inputs, targets = sample_dict["fit"]
+    predictions = jax.vmap(space.models[0])(inputs)
+    mse = jnp.mean((predictions - targets) ** 2)
+    return {"total": mse} 
 
 def log_inr_error(data_dir: Path, arch: str, current_time: float, final_loss: float, frob_error: float, sim_time: float, comp_time: float):
     """Log loss + Frobenius error + CPU times in inr_errors.csv """
@@ -326,19 +317,21 @@ def compress_inr(
         model = get_inr_model(arch, subkey)
     else:
         model = params_init
+    
+    space = ApproximationSpace(dims={"x": 2}, list_models=[(model, "scalar", None)], model_type="x")
         
     loss_history = []
     
     #ADAM optimization (mini-batchs)
     print(f"\n[INR/{arch}] --- Beginning Phase 1: ADAM ({max_iters} iters) ---")
-    adam_opt = ScimbaAdam(model, losses_function, grad_loss_function, learning_rate=lr)
+    adam_opt = ScimbaAdam(space, losses_function, learning_rate=lr)
     
     for i in range(max_iters):
         key, subkey = jax.random.split(key)
         batch_idx = jax.random.choice(subkey, total_points, shape=(batch_size,), replace=False)
-        batch = (inputs[batch_idx], targets[batch_idx])
+        sample_dict = {"fit": (inputs[batch_idx], targets[batch_idx])}
         
-        loss_dict, model, adam_opt = adam_opt.update(model, batch)
+        loss_dict, space, adam_opt = adam_opt.update(space, sample_dict)
         loss_val = float(loss_dict["total"])
         loss_history.append(loss_val)
         
@@ -350,11 +343,11 @@ def compress_inr(
     
     #L-BFGS optimization (full batch)
     print(f"[INR/{arch}] --- Beginning Phase 2: L-BFGS ---")
-    full_batch = (inputs, targets)
-    lbfgs_opt = ScimbaLBfgs(model, losses_function, grad_loss_function)
+    full_sample_dict = {"fit": (inputs, targets)}
+    lbfgs_opt = ScimbaLBfgs(space, losses_function)
     
     for i in range(lbfgs_iters):
-        loss_dict, model, lbfgs_opt = lbfgs_opt.update(model, full_batch)
+        loss_dict, space, lbfgs_opt = lbfgs_opt.update(space, full_sample_dict)
         loss_val = float(loss_dict["total"])
         loss_history.append(loss_val)
         
@@ -366,6 +359,7 @@ def compress_inr(
             break
     
     #evaluation and backup 
+    model = space.models[0]
     f_comp_flat = jax.vmap(model)(inputs)
     f_comp = f_comp_flat.reshape(f_full.shape)
     

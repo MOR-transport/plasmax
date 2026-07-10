@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from scimba_jax.domains.meshless_domains.domains_1d import Segment1D
 from scimba_jax.nonlinear_approximation.integration.monte_carlo import DomainSampler, TensorizedSampler
 from scimba_jax.nonlinear_approximation.integration.monte_carlo_time import UniformTimeSampler
-from scimba_jax.nonlinear_approximation.integration.monte_carlo_parameters import UniformVelocitySampler
+from scimba_jax.nonlinear_approximation.integration.monte_carlo_parameters import UniformParametricSampler
 from scimba_jax.nonlinear_approximation.integration.data_sampler import DataSampler
 from scimba_jax.physical_models.data_residuals import CollocDataResidual
 
@@ -36,7 +36,7 @@ def create_collocation_sampler(t_min: float, t_max: float, x_min: float, x_max: 
     sampler_t = UniformTimeSampler((t_min, t_max))
     domain_x = Segment1D((x_min, x_max), is_main_domain=True)
     sampler_x = DomainSampler(domain_x)
-    sampler_v = UniformVelocitySampler([(v_min, v_max)])
+    sampler_v = UniformParametricSampler([(v_min, v_max)])
     
     sampler_physics = TensorizedSampler(
         list_sampler=[sampler_t, sampler_x, sampler_v],
@@ -78,6 +78,9 @@ def create_data_sampler(cfg: Config, t_grid: jnp.ndarray, f_hist: jnp.ndarray, d
     
     print(f"Data assimilation: Keeping {N_keep} points out of {N_total} ({data_ratio*100:.1f}%)")
     
-    data_sampler = DataSampler(data=(inputs_masked, outputs_masked))
+    inputs_masked_jax = jnp.array(inputs_masked)
+    outputs_masked_jax = jnp.array(outputs_masked)
+    
+    data_sampler = DataSampler(data=(inputs_masked_jax, outputs_masked_jax))
     
     return data_sampler
