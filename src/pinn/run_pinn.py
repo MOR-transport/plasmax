@@ -64,10 +64,9 @@ def main():
     key = jax.random.PRNGKey(42)
     key, subkey = jax.random.split(key)
     
-    # Utilisation de la Factory propre
+    # Utilisation de la factory
     network = get_pinn_network(args.arch, cfg.grid.lx, subkey)
     
-    # Correction : dims={} pour que scimba_jax les déduise de "t_x_v"
     space = ApproximationSpace(
         dims={"t": 1, "x": 1, "v": 1},
         list_models=[(network, "scalar", None)],
@@ -126,20 +125,23 @@ def main():
                 return sample_func
         
         sampler = PINNSampler()
-        loss_weights = {"interior": [1.0], "data_assim": [args.lambda_data]}
+        # weights configuration
+        weights_data_only = {"interior": [0.0], "data_assim": [args.lambda_data]}
+        weights_full = {"interior": [1.0], "data_assim": [args.lambda_data]}
         
         # Phase 1: ADAM
-        print("Phase 1: ADAM optimization...")
-        proj_adam = Projector(model=pde_model, space=space, sampler=sampler, optimizer="Adam", learning_rate=1e-3, weights=loss_weights)
+        print("Phase 1: ADAM optimization with L_data only...")
+        proj_adam = Projector(model=pde_model, space=space, sampler=sampler, optimizer="Adam", learning_rate=1e-3, weights=weights_data_only)
         key, proj_adam = proj_adam.project(key=key, space=space, n_epochs=2000, n_colloc=10000, n_dl_colloc=2000, verbose=False)
         loss_adam = float(proj_adam.best_loss["total"])
         
-        # Phase 2: L-BFGS
-        print("Phase 2: L-BFGS optimization...")
+        #phase 2: L-BFGS
+        print("Phase 2: L-BFGS optimization with full loss (L_data + L_physics)...")
         space_after_adam = proj_adam.space
-        proj_lbfgs = Projector(model=pde_model, space=space_after_adam, sampler=sampler, optimizer="L-BFGS", weights=loss_weights)
+        proj_lbfgs = Projector(model=pde_model, space=space_after_adam, sampler=sampler, optimizer="L-BFGS", weights=weights_full)
         key, proj_lbfgs = proj_lbfgs.project(key=key, space=space_after_adam, n_epochs=50, n_colloc=15000, n_dl_colloc=5000, verbose=False)
         loss_lbfgs = float(proj_lbfgs.best_loss["total"])
+        
         
         train_time = time.perf_counter() - t0_train
         

@@ -12,8 +12,9 @@ from scimba_jax.physical_models.data_residuals import CollocDataResidual
 
 from src.config import Config
 
+"""
 def build_E_interpolator(t_grid: jnp.ndarray, x_grid: jnp.ndarray, E_hist: jnp.ndarray):
-    """Function to interpolate E(t,x) in all continuous point """
+    #Function to interpolate E(t,x) in all continuous point
     t_min, t_max = t_grid[0], t_grid[-1]
     x_min, x_max = x_grid[0], x_grid[-1]
     Nt, Nx = E_hist.shape
@@ -30,6 +31,28 @@ def build_E_interpolator(t_grid: jnp.ndarray, x_grid: jnp.ndarray, E_hist: jnp.n
         return E_vals.reshape(t_eval.shape)
     
     return jax.jit(E_interp)
+"""
+
+def build_E_interpolator(t_grid: jnp.ndarray, x_grid: jnp.ndarray, E_hist: jnp.ndarray):
+    """Interpolation of E(t,x) : exact in time (Nearest), linear in space """
+    t_min, t_max = t_grid[0], t_grid[-1]
+    x_min, x_max = x_grid[0], x_grid[-1]
+    Nt, Nx = E_hist.shape
+    
+    def E_interp(x_eval, t_eval):
+        #rounding of the time index to the nearest integer
+        t_idx = jnp.round((t_eval - t_min) / (t_max - t_min) * (Nt - 1))
+        #the spatial index remains fractional
+        x_idx = (x_eval - x_min) / (x_max - x_min) * (Nx - 1)
+        
+        coords = jnp.stack([t_idx.flatten(), x_idx.flatten()], axis=0)
+        # Order=1 will do a spatial linear interpolation, and read the exact timeline
+        E_vals = jax.scipy.ndimage.map_coordinates(E_hist, coords, order=1, mode='nearest')
+        
+        return E_vals.reshape(t_eval.shape)
+    
+    return jax.jit(E_interp)
+        
 
 def create_collocation_sampler(t_min: float, t_max: float, x_min: float, x_max: float, v_min: float, v_max: float):
     """Create the Sampler for the continuous collocation points (L_physics)"""
