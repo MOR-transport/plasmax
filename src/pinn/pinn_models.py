@@ -43,7 +43,7 @@ class PeriodicMLPScimbaINR(eqx.Module):
 class SiRENScimbaINR(eqx.Module):
     """Spatio-temporal SIREN architecture"""
     layers: tuple
-    omega_0: float
+    omega_0: float = eqx.field(static=True)
     
     def __init__(self, in_size: int, out_size: int, hidden_sizes: list[int], omega_0: float, key: jax.Array):
         self.omega_0 = omega_0
@@ -104,7 +104,7 @@ class FourierMLPScimbaINR(eqx.Module):
         )
         
     def __call__(self, txv_inputs: jnp.ndarray) -> jnp.ndarray:
-        proj = txv_inputs @ self.B
+        proj = txv_inputs @ jax.lax.stop_gradient(self.B)
         h = jnp.concatenate([jnp.sin(proj), jnp.cos(proj)], axis=-1)
         return self.network(h)
     
@@ -129,7 +129,7 @@ class PeriodicFourierMLPScimbaINR(eqx.Module):
         
     def __call__(self, txv_inputs: jnp.ndarray) -> jnp.ndarray:
         h = apply_spatial_periodic_embedding(txv_inputs, lx=self.lx)
-        proj = h @ self.B
+        proj = h @ jax.lax.stop_gradient(self.B)
         h_fourier = jnp.concatenate([jnp.sin(proj), jnp.cos(proj)], axis=-1)
         return self.network(h_fourier)
     

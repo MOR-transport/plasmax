@@ -118,7 +118,7 @@ class PeriodicMLPScimbaINR(eqx.Module):
 class SIRENScimbaINR(eqx.Module):
     """Wrapper for a SIREN architecture"""
     layers: tuple
-    omega_0: float
+    omega_0: float = eqx.field(static=True)
 
     def __init__(self, in_size: int, out_size: int, hidden_sizes: list[int], omega_0: float, key: jax.Array):
         self.omega_0 = omega_0
@@ -168,6 +168,9 @@ class PeriodicSIRENScimbaINR(eqx.Module):
         
         h = jnp.concatenate([x_embedded, v_coord], axis=-1)
         return self.network(h)
+    
+    def ndof(self) -> int:
+        return self.network.ndof()
 
 class FourierScimbaINR(eqx.Module):
     """
@@ -189,9 +192,13 @@ class FourierScimbaINR(eqx.Module):
         )
     
     def __call__(self, x_input: jnp.ndarray) -> jnp.ndarray:
-        proj = x_input @ self.B
+        proj = x_input @ jax.lax.stop_gradient(self.B)
         h = jnp.concatenate([jnp.sin(proj), jnp.cos(proj)], axis=-1)
         return self.network(h)
+    
+    def ndof(self) -> int:
+        flat_params, _ = jax.tree_util.tree_flatten(self)
+        return sum(p.size for p in flat_params if isinstance(p, jnp.ndarray))
     
 class PeriodicFourierScimbaINR(eqx.Module):
     """
@@ -224,10 +231,13 @@ class PeriodicFourierScimbaINR(eqx.Module):
         ], axis=-1)
         
         h = jnp.concatenate([x_embedded, v_coord], axis=-1)
-        proj = h @ self.B
+        proj = h @ jax.lax.stop_gradient(self.B)
         h_fourier = jnp.concatenate([jnp.sin(proj), jnp.cos(proj)], axis=-1)
         
         return self.network(h_fourier)
+    
+    def ndof(self) -> int:
+        return self.network.ndof()
 
 AVAILABLE_INR_ARCHS = [
     "mlp_16", "mlp_64", "mlp_128", "deep_128",
@@ -365,114 +375,6 @@ def compress_inr(
     
     frob_error = float(jnp.linalg.norm(f_comp - f_full) / jnp.linalg.norm(f_full))
     
-    t1 = time.perf_counter()
-    comp_time = t1 - t0
-    
-    print(f"[INR/{arch}] Final Loss: {loss_val:.2e} | Frobenius Error: {frob_error:.2e}\n")
-    print(f"[INR/{arch}] Sim Time: {sim_time:.2f}s | Comp Time: {comp_time:.2f}s\n")
-    
-    log_inr_error(data_dir, arch, current_time, loss_val, frob_error, sim_time, comp_time)
-    
-    return f_comp, model, jnp.array(loss_history)
-
-def compress_inr_2(
-    f_full: jnp.ndarray,
-    grid_X: jnp.ndarray,
-    grid_V: jnp.ndarray,
-    lx: float,
-    lv: float,
-    current_time: float,
-    data_dir: Path,
-    arch: str = "periodic_mlp_64",
-    params_init: Any = None,
-    lr: float = 1e-3,
-    max_iters: int = 2000,
-    batch_size: int = 2000,
-    threshold: float = 1e-8,
-    lbfgs_iters: int = 50,
-    sim_time: float = 0.0
-):
-    """
-    Fit an INR network to approximate f_full.
-    Uses ADAM + L-BFGS for the first segment (t=5), 
-    and switches to Pure L-BFGS for subsequent segments (t > 5) to leverage warm-starting.
-    """
-    t0 = time.perf_counter()
-    
-    x_raw = grid_X.flatten() / lx
-    v_norm = grid_V.flatten() / lv
-    
-    inputs = jnp.stack([x_raw, v_norm], axis=-1)
-    targets = f_full.flatten()[:, None]
-    total_points = inputs.shape[0]
-    
-    key = jax.random.PRNGKey(42)
-    
-    if params_init is None:
-        key, subkey = jax.random.split(key)
-        model = get_inr_model(arch, subkey)
-    else:
-        model = params_init
-        
-    loss_history = []
-    loss_val = jnp.inf 
-    
-    # L-BFGS for t > 5 (Bypassing ADAM)
-    if current_time > 5.0:
-        print(f"\n[INR/{arch}] --- Phase Pure L-BFGS (t={current_time:.2f} | Bypassing ADAM) ---")
-        full_batch = (inputs, targets)
-        lbfgs_opt = ScimbaLBfgs(model, losses_function, grad_loss_function)
-        lbfgs_iters = lbfgs_iters * 2  
-        
-        for i in range(lbfgs_iters):
-            loss_dict, model, lbfgs_opt = lbfgs_opt.update(model, full_batch)
-            loss_val = float(loss_dict["total"])
-            loss_history.append(loss_val)
-            
-            if i % 10 == 0 or i == lbfgs_iters - 1:
-                print(f" [Pure L-BFGS] iter {i:3d} - loss: {loss_val:.2e}")
-            
-            if loss_val < threshold:
-                print(f" [Pure L-BFGS] Convergence achieved at iteration {i}")
-                break
-    # classic routine : ADAM + L-BFGS for the first segment t=5
-    else:
-        print(f"\n[INR/{arch}] --- Beginning Phase 1 : ADAM (t={current_time:.2f} | {max_iters} iters) ---")
-        adam_opt = ScimbaAdam(model, losses_function, grad_loss_function, learning_rate=lr)
-        
-        for i in range(max_iters):
-            key, subkey = jax.random.split(key)
-            batch_idx =jax.random.choice(subkey, total_points, shape=(batch_size,), replace=False)
-            batch = (inputs[batch_idx], targets[batch_idx])
-            
-            loss_dict, model, adam_opt = adam_opt.update(model, batch)
-            loss_val = float(loss_dict["total"])
-            loss_history.append(loss_val)
-            
-            if i % 100 == 0: 
-                print(f" [ADAM] iter {i:4d} - loss: {loss_val:.2e}")
-                if loss_val < threshold:
-                    print(f" [ADAM] Anticipated convergence at iteration {i}")
-                    break   
-        
-        print(f"\n[INR/{arch}] --- Beginning Phase 2 : L-BFGS (t={current_time:.2f}) ---")
-        full_batch = (inputs, targets)
-        lbfgs_opt = ScimbaLBfgs(model, losses_function, grad_loss_function)
-        
-        for i in range(lbfgs_iters):
-            loss_dict, model, lbfgs_opt = lbfgs_opt.update(model, full_batch)
-            loss_val = float(loss_dict["total"])
-            loss_history.append(loss_val)
-            print(f" [L-BFGS] iter {i:4d} - loss: {loss_val:.2e}")
-            
-            if loss_val < threshold:
-                print(f" [L-BFGS] Convergence achieved at iteration {i}")
-                break
-    
-    # evaluation and backup
-    f_comp_flat = jax.vmap(model)(inputs)
-    f_comp = f_comp_flat.reshape(f_full.shape)
-    frob_error = float(jnp.linalg.norm(f_comp - f_full) / jnp.linalg.norm(f_full))
     t1 = time.perf_counter()
     comp_time = t1 - t0
     
