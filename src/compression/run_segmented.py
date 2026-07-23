@@ -5,10 +5,10 @@ import jax.numpy as jnp
 import numpy as np
 import time
 from pathlib import Path 
-from .config import load_config, Paths 
-from .sim import run_time_loop 
-from .compression import compress_inr, compress_inr_2, compress_pod, AVAILABLE_INR_ARCHS
-from .plotting import plot_inr_benchmark_comparison, plot_loss_history, plot_pod_benchmark_comparison
+from ..config import load_config, Paths 
+from ..sim import run_time_loop 
+from .compression import compress_inr, compress_pod, AVAILABLE_INR_ARCHS
+from ..plotting import plot_inr_benchmark_comparison, plot_loss_history, plot_pod_benchmark_comparison
 
 jax.config.update("jax_enable_x64", True)
 

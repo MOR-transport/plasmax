@@ -92,7 +92,7 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
 
     # Number of iterations from the initial time
     remaining = max(0.0, cfg.time.tend - t)
-    nt_cap = min(cfg.time.nt_max, int(math.ceil(remaining / cfg.time.dt)))
+    nt_cap = min(cfg.time.nt_max, int(round(remaining / cfg.time.dt)))
     if nt_cap <= 0:
         print("Nothing to simulate (tend already reached).")
         return jnp.empty((0, grid.nv, grid.nx)), jnp.empty((0, grid.nx))
@@ -161,6 +161,15 @@ def run_time_loop(cfg, src=None, inicond=None, format="png", nb_profile=0,
     save_path.parent.mkdir(parents=True, exist_ok=True)
     jnp.savez(save_path, f=f, t=t, it=global_it)
     print(f"Save state (f,t,it) to {save_path}")
+    
+    #--for data assimilation--- 
+    t_start = t - (nt_cap * cfg.time.dt)
+    t_grid = jnp.linspace(t_start, t, nt_cap + 1)
+    
+    # complete spatio-temporal history of the segment
+    history_path = cfg.paths.data_dir / f"history_t{t:05.2f}.npz"
+    jnp.savez(history_path, f_hist=f_hist, Efield_hist=Efield_hist, t_grid=t_grid)
+    print(f"Save segment history to {history_path.name}")
 
     return f_hist, Efield_hist
 
