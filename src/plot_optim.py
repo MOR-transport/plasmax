@@ -4,7 +4,7 @@ import argparse
 import jax.numpy as jnp
 
 from .config import load_config
-from .plotting import plot_optimisation, plot_grad_info, plot_opt_source
+from .plotting import plot_optimisation, plot_grad_info, plot_opt_source, plot_norm_lambda
 
 def plot_datas(cfg, datas, suffix, format):
     Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
@@ -16,6 +16,7 @@ def plot_datas(cfg, datas, suffix, format):
     iniconds = list(datas["iniconds"])
     f_hists = list(datas["f_hists"])
     f_exp = datas["f_exp"]
+    lbdas = datas["lbdas"]
 
     if suffix == "adj":
         opt_srcs = list(datas["opt_srcs"])
@@ -26,6 +27,7 @@ def plot_datas(cfg, datas, suffix, format):
     for it in range(1, len(iniconds)):
         plot_optimisation(cfg, residuals[:it], norm_grads[:it], alphas[:it], iniconds[it], f_hists[it], f_exp, cfg.paths.plot_dir / f"opt_{it:04d}_{suffix}.{format}")
         plot_grad_info(cfg, iniconds[it], gradients[it-1], cfg.paths.plot_dir / f"grad_{it:04d}_{suffix}.{format}")
+        plot_norm_lambda(cfg, lbdas[it-1], cfg.paths.plot_dir / f"norm_lambda_{it:04d}_{suffix}.{format}")
         if suffix == "adj":
             plot_opt_source(cfg, opt_srcs[it-1], cfg.paths.plot_dir / f"opt_src_{it:04d}_{suffix}.{format}")
 

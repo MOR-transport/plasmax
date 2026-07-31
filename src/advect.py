@@ -36,6 +36,26 @@ def _cubic_periodic_sample(f1d: jnp.ndarray, s: jnp.ndarray) -> jnp.ndarray:
     return w0 * y0 + w1 * y1 + w2 * y2 + w3 * y3
 
 
+def _cubic_dirichlet_gather(f_in: jnp.ndarray, s: jnp.ndarray) -> jnp.ndarray:
+    n = f_in.shape[0]
+    k = jnp.floor(s).astype(jnp.int32)
+    xi = s - k
+    
+    w0, w1, w2, w3 = _cubic_periodic_weights(xi)
+    
+    indices = [k - 1, k, k + 1, k + 2]
+    weights = [w0, w1, w2, w3]
+    
+    f_out = jnp.zeros_like(s)
+    
+    for idx, w in zip(indices, weights):
+        mask = (idx >= 0) & (idx < n)
+        val = jnp.where(mask, f_in[jnp.where(mask, idx, 0)], 0.0)       
+        f_out = f_out + w * val
+        
+    return f_out
+
+
 def _adv_x(f: jnp.ndarray, grid: Grid, dt: float) -> jnp.ndarray:
     """Advect along x with speed v (periodic in x). ``f`` shape (Nv, Nx)."""
     x_new = grid.X - grid.V * dt
@@ -52,14 +72,10 @@ def _adv_v(f: jnp.ndarray, grid: Grid, efield: jnp.ndarray, dt: float) -> jnp.nd
     """Advect along v with acceleration qE/m"""
     lv = float(grid.lv)
     dv = float(grid.dv)
-    period_v = 2.0 * lv
     v_new = grid.V + efield[jnp.newaxis, :] * dt
-    s = jnp.mod(v_new + lv, period_v) / dv
+    s = (v_new + lv) / dv
 
-    def interp_col(f_col: jnp.ndarray, s_col: jnp.ndarray) -> jnp.ndarray:
-        return jax.vmap(_cubic_periodic_sample, in_axes=(None, 0))(f_col, s_col)
-
-    return jax.vmap(interp_col, in_axes=1, out_axes=1)(f, s)
+    return jax.vmap(_cubic_dirichlet_gather, in_axes=(1, 1), out_axes=1)(f, s)
 
 
 def advect(f: jnp.ndarray, efield: jnp.ndarray, grid: Grid, dt: float, order: int) -> jnp.ndarray:

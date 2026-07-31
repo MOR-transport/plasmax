@@ -1,6 +1,6 @@
 method: predcorr # or nufi (not implemented in Python yet)
 physics:
-  charge: -1.0
+  charge: 1.0
   mass: 1.0
 interp:
   order: 3
@@ -13,8 +13,8 @@ grid:
 time:
   nt_max: 4000
   dt: 0.1
-  tend: 15
-  plot_freq: 10
+  tend: 1
+  plot_freq: 0
 optim:
   target: two_stream
   eps: 0.05
@@ -31,6 +31,6 @@ optim:
   # nb: 0.1
   filter_xv: ones
   filter_t: ones
-  lr: 1
-  Nopt: 50
+  lr: 100
+  Nopt: 20
  

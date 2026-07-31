@@ -30,7 +30,6 @@ optim:
   # vt: 0.2
   # nb: 0.1
   filter_xv: ones
-  filter_t: ones
+  filter_t: gate_t
   lr: 1
   Nopt: 50
- 

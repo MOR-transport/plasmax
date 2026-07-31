@@ -10,17 +10,62 @@ import jax.numpy as jnp
 from .config import load_config
 from .inicond import get_inicond, get_inicond_exp
 from .sim import run_time_loop
-from .advect import advect_with_source_hist
+from .advect import advect_with_source_hist, _adv_x, _adv_v, advect
+from .advect_adj import advect_adj, _adv_x_adj, _adv_v_adj, compute_mu
 from .plotting import make_anim_2d, plot_optimisation, plot_grad_info, compare_auto_grad, plot_opt_source
-from .source import get_filters_exp, compute_src 
+from .source import get_filters_exp, compute_src
+from .physics import compute_density_adj, vpoisson_adj, compute_density, vpoisson
 
 jax.config.update("jax_enable_x64", True)
-
 
 def functionnal(cfg, f_hist, fexp):
     sigxv, sigt = get_filters_exp(cfg)
     integrant = (1/2) * (f_hist - fexp)**2 * ( sigxv * sigt )
     return jnp.sum(integrant) * cfg.time.dt * cfg.grid.dx * cfg.grid.dv
+
+
+def run_time_loop_adjoint_dto(cfg, f_hist, Efield_hist, src):
+    grid = cfg.grid
+    nt_cap = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
+    dt = cfg.time.dt 
+    ord_ = cfg.interp.order
+    q_m = cfg.physics.charge / cfg.physics.mass
+
+    lambda_hist = jnp.zeros((nt_cap, grid.nv, grid.nx), dtype=jnp.float64)
+    lambda_hist = lambda_hist.at[-1, :, :].set(- src[-1] * cfg.time.dt)
+
+    for n in range(nt_cap - 2, -1, -1):
+        f_primal = f_hist[n, :, :]
+        f_star = _adv_x(f_primal, grid, dt / 2.0)
+        lambda_next = lambda_hist[n + 1, :, :]
+
+        rho0 = compute_density(f_primal, float(grid.dv))
+        e0 = vpoisson(rho0, grid, cfg.physics.charge)
+        
+        # ==========================================
+        # 1. CORRECTOR
+        # ==========================================
+        lam_f_corr, lam_e12_scaled = advect_adj(lambda_next, f_star, q_m * Efield_hist[n], grid, dt, ord_)
+        lam_e12 = lam_e12_scaled * q_m
+        # ==========================================
+
+        # ==========================================
+        # 2. PREDICTOR
+        # ==========================================
+        lam_rho12 = vpoisson_adj(lam_e12, grid, cfg.physics.charge)
+        lam_f12 = compute_density_adj(lam_rho12, grid)
+        
+        lam_f_pred, lam_e0_scaled = advect_adj(lam_f12, f_star, q_m * e0, grid, dt / 2.0, ord_)
+        lam_e0 = lam_e0_scaled * q_m
+        # ==========================================
+
+        lam_rho0 = vpoisson_adj(lam_e0, grid, cfg.physics.charge)
+        lam_f_rho0 = compute_density_adj(lam_rho0, grid)
+
+        lambda_f = lam_f_corr + lam_f_pred + lam_f_rho0 - src[n] * cfg.time.dt
+        lambda_hist = lambda_hist.at[n, :, :].set(lambda_f)
+
+    return lambda_hist
 
 
 def run_time_loop_adjoint(cfg, Efield, src, verbose=False):
@@ -66,6 +111,7 @@ def run_time_loop_adjoint(cfg, Efield, src, verbose=False):
 def line_search_step(cfg, alpha, inicond, grad):
 
     inicond_new = inicond - alpha * grad
+    inicond_new = jnp.maximum(inicond_new, 0.0)
     f_new, Efield_new = run_time_loop(cfg, inicond=inicond_new, disabled_save=True, verbose=False)
 
     return inicond_new, f_new, Efield_new, alpha
@@ -94,7 +140,7 @@ def line_search(cfg, inicond, f, fexp, grad, alpha_init, m=1e-4, theta=0.5):
             return line_search_step(cfg, alpha, inicond, grad)
 
 
-def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
+def adjoint(cfg, compute_grad, line_search_opt=True, tolerance=1E-4, format="png"):
     cfg.time.plot_freq = 0
 
     inicond_exp = get_inicond_exp(cfg)(cfg.grid.X, cfg.grid.V)
@@ -111,6 +157,11 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
     iniconds = [inicond.copy()]
     f_hists = []
     opt_srcs = []
+    lbdas = []
+
+    def func_to_minimize(inicond):
+        f, _ = run_time_loop(cfg, inicond=inicond, disabled_save=True, verbose=False)
+        return functionnal(cfg, f, f_exp)
 
     print("\n# ========== Start running the simulation framework ========== %")
 
@@ -121,6 +172,7 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
         print(f"##### Iteration {it:3d} #####")
         
         residuals.append(functionnal(cfg, f_hist, f_exp))
+        print("FUNCTIONAL : ", residuals[-1])
         
         # Halting condition : progress in the objective function
         if it > 1 and residuals[-2]-residuals[-1] < tolerance*residuals[-2]:
@@ -130,8 +182,12 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
 
         src = compute_src(cfg, f_hist, f_exp)
         opt_srcs.append(src)
-        adj_hist = run_time_loop_adjoint(cfg, Efield_hist, src, verbose=False)
+        adj_hist = compute_grad(cfg, f_hist, Efield_hist, src)
+        lbdas.append(adj_hist)
         grad = - adj_hist[0, :, :]
+
+        auto_grad = jax.grad(func_to_minimize)(inicond) / ( cfg.grid.dx * cfg.grid.dv )
+        print("Comparison with auto differentiation : ", jnp.max(jnp.abs(auto_grad - grad)))
 
         gradients.append(grad.copy())
         norm_grads.append(jnp.sqrt(jnp.sum(grad ** 2) / (cfg.grid.lx * cfg.grid.lv)))
@@ -162,7 +218,7 @@ def adjoint(cfg, line_search_opt=True, tolerance=1E-4, format="png"):
         print("\n")
 
     print("# ============= Simulation framework terminates ============= %")
-    return residuals, norm_grads, gradients, alphas, iniconds, f_hists, f_exp, opt_srcs
+    return residuals, norm_grads, gradients, alphas, iniconds, f_hists, f_exp, opt_srcs, lbdas
 
 
 def optimize(cfg):
@@ -171,7 +227,8 @@ def optimize(cfg):
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
 
-    residuals, norm_grads, gradients, alphas, iniconds, f_hists, f_exp, opt_srcs = adjoint(cfg, line_search_opt=True)
+    compute_grad = run_time_loop_adjoint_dto
+    residuals, norm_grads, gradients, alphas, iniconds, f_hists, f_exp, opt_srcs, lbdas = adjoint(cfg, compute_grad=compute_grad, line_search_opt=True)
 
     save_path = cfg.paths.data_dir / "adj_diff_optim.npz"
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -183,7 +240,8 @@ def optimize(cfg):
               iniconds=iniconds, 
               f_hists=f_hists,
               opt_srcs=opt_srcs,
-              f_exp=f_exp)
+              f_exp=f_exp,
+              lbdas=lbdas)
     print(f"Save optimization datas to {save_path}")
 
 

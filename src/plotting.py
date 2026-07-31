@@ -165,7 +165,7 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     fig, axs = plt.subplots(2, 3, figsize=(35, 18))
 
     iterations = jnp.arange(1, len(residual)+1)
-    axs[0][0].semilogy(iterations, residual, "x-")
+    axs[0][0].semilogy(iterations, [1e-10 if x<=1e-15 else x for x in residual], "x-")
     axs[0][0].set_xlabel("Iteration")
     axs[0][0].set_ylabel(r"$\log J(f) $")
     axs[0][0].set_title(r"Evolution of the functional $ J(f) $")
@@ -173,7 +173,7 @@ def plot_optimisation(cfg, residual, grad, alphas, inicond, f, f_exp, fname):
     axs[0][0].set_yticks(residual)
     axs[0][0].set_yticklabels([f"{tick:.2e}" for tick in residual])
 
-    axs[0][1].semilogy(iterations, grad, "x-")
+    axs[0][1].semilogy(iterations, [1e-10 if x<=1e-15 else x for x in grad], "x-")
     axs[0][1].set_xlabel("Iteration")
     axs[0][1].set_ylabel(r"$\log \left\| \nabla J(f) \right\|$")
     axs[0][1].set_title(r"Evolution of the gradient $\left\| \nabla J(f) \right\|$")
@@ -252,6 +252,26 @@ def plot_grad_info(cfg, inicond, adj_grad, fname):
     fig.colorbar(pcm_grad, ax=axs[2])
     axs[2].set_xlabel(r"$x$")
     axs[2].set_ylabel(r"$v$")
+
+    fig.tight_layout()
+
+    if fname is not None:
+        save_fig(fname, fig)
+        plt.close(fig)
+    else:
+        plt.show()
+
+
+def plot_norm_lambda(cfg, lbda, fname):
+    fig, ax = plt.subplots(1, 1, figsize=(40, 15))
+
+    Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
+    abscisses = jnp.linspace(0, cfg.time.tend, Nt)
+    lbda_norm = jnp.sqrt(jnp.sum(lbda ** 2, axis=[1, 2])/len(lbda))
+
+    ax.plot(abscisses, lbda_norm)
+    ax.set_title(f"Norm of lambda")
+    ax.set_xlabel(r"$t$")
 
     fig.tight_layout()
 

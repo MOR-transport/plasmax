@@ -13,7 +13,7 @@ grid:
 time:
   nt_max: 4000
   dt: 0.1
-  tend: 15
+  tend: 1
   plot_freq: 10
 optim:
   target: two_stream
@@ -30,7 +30,7 @@ optim:
   # vt: 0.2
   # nb: 0.1
   filter_xv: ones
-  filter_t: ones
+  filter_t: gate_t
   lr: 1
   Nopt: 50
  

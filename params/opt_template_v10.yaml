@@ -32,5 +32,4 @@ optim:
   filter_xv: ones
   filter_t: ones
   lr: 1
-  Nopt: 50
- 
+  Nopt: 10

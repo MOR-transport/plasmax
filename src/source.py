@@ -37,7 +37,7 @@ def gaussian_x(cfg, a=500, b=30):
     return jnp.broadcast_to(res, (cfg.grid.nv, cfg.grid.nx))[None, :, :]
 
 
-def gate_x(cfg, a=15, b=40):
+def gate_x(cfg, a=15, b=31.41592653589793):
     x_row = cfg.grid.x[None, :]
     return jnp.float64((a <= x_row) & (x_row <= b))[None, :, :]
 
@@ -54,7 +54,7 @@ def tanh_t(cfg, t_star=0.8):
     return  0.5 + 0.5 * jnp.tanh(10 * (t - t_star))[:, None, None]
 
 
-def gate_t(cfg, a=0.8, b=1):
+def gate_t(cfg, a=0.5, b=1):
     Nt = min(cfg.time.nt_max, int(math.ceil(abs(cfg.time.tend / cfg.time.dt)))) + 1
     t = jnp.linspace(0, cfg.time.tend, Nt)
     return jnp.float64((a <= t) & (t <= b))[:, None, None]
