@@ -13,16 +13,20 @@ from .sim import run_time_loop
 from .advect import advect_with_source_hist, _adv_x, _adv_v, advect
 from .advect_adj import advect_adj, _adv_x_adj, _adv_v_adj, compute_mu
 from .plotting import make_anim_2d, plot_optimisation, plot_grad_info, compare_auto_grad, plot_opt_source
-from .source import get_filters_exp, compute_src
+from .source import get_filters_exp, compute_src, density, temperature, compute_src_control
 from .physics import compute_density_adj, vpoisson_adj, compute_density, vpoisson
 
 jax.config.update("jax_enable_x64", True)
 
-def functionnal(cfg, f_hist, fexp):
+def functional(cfg, f_hist, fexp):
     sigxv, sigt = get_filters_exp(cfg)
     integrant = (1/2) * (f_hist - fexp)**2 * ( sigxv * sigt )
     return jnp.sum(integrant) * cfg.time.dt * cfg.grid.dx * cfg.grid.dv
 
+def functional_control(cfg, f_hist, fexp):
+    sigxv, sigt = get_filters_exp(cfg)
+    integrant = (1/2) * ( (density(cfg, f_hist) - density(cfg, fexp))**2 +  (temperature(cfg, f_hist) - temperature(cfg, fexp))**2) * ( sigxv * sigt )
+    return jnp.sum(integrant) * cfg.time.dt * cfg.grid.dx * cfg.grid.dv
 
 def run_time_loop_adjoint_dto(cfg, f_hist, Efield_hist, src):
     grid = cfg.grid
@@ -117,13 +121,13 @@ def line_search_step(cfg, alpha, inicond, grad):
     return inicond_new, f_new, Efield_new, alpha
 
 
-def line_search(cfg, inicond, f, fexp, grad, alpha_init, m=1e-4, theta=0.5):
+def line_search(cfg, inicond, functional_to_minimize, f, fexp, grad, alpha_init, m=1e-4, theta=0.5):
     alpha = alpha_init
 
     if alpha <= 1e-8:
         return line_search_step(cfg, alpha, inicond, grad)
 
-    J = lambda f: functionnal(cfg, f, fexp)
+    J = lambda f: functional_to_minimize(cfg, f, fexp)
 
     while True:
         print(f"\nTRY ALPHA = {alpha}")
@@ -140,7 +144,7 @@ def line_search(cfg, inicond, f, fexp, grad, alpha_init, m=1e-4, theta=0.5):
             return line_search_step(cfg, alpha, inicond, grad)
 
 
-def adjoint(cfg, compute_grad, line_search_opt=True, tolerance=1E-4, format="png"):
+def adjoint(cfg, compute_grad, functional_to_minimize, line_search_opt=True, tolerance=1E-4, format="png"):
     cfg.time.plot_freq = 0
 
     inicond_exp = get_inicond_exp(cfg)(cfg.grid.X, cfg.grid.V)
@@ -161,7 +165,7 @@ def adjoint(cfg, compute_grad, line_search_opt=True, tolerance=1E-4, format="png
 
     def func_to_minimize(inicond):
         f, _ = run_time_loop(cfg, inicond=inicond, disabled_save=True, verbose=False)
-        return functionnal(cfg, f, f_exp)
+        return functional_to_minimize(cfg, f, f_exp)
 
     print("\n# ========== Start running the simulation framework ========== %")
 
@@ -171,7 +175,7 @@ def adjoint(cfg, compute_grad, line_search_opt=True, tolerance=1E-4, format="png
     for it in range(1, cfg.optim.Nopt+1):
         print(f"##### Iteration {it:3d} #####")
         
-        residuals.append(functionnal(cfg, f_hist, f_exp))
+        residuals.append(functional_to_minimize(cfg, f_hist, f_exp))
         print("FUNCTIONAL : ", residuals[-1])
         
         # Halting condition : progress in the objective function
@@ -180,7 +184,13 @@ def adjoint(cfg, compute_grad, line_search_opt=True, tolerance=1E-4, format="png
             print("Insufficient progression")
             break
 
-        src = compute_src(cfg, f_hist, f_exp)
+        if functional_to_minimize is functional:
+            src = compute_src(cfg, f_hist, f_exp)
+        elif functional_to_minimize is functional_control:
+            src = compute_src_control(cfg, f_hist, f_exp)
+        else:
+            print("Error : functional to minimize not recognised")
+            return
         opt_srcs.append(src)
         adj_hist = compute_grad(cfg, f_hist, Efield_hist, src)
         lbdas.append(adj_hist)
@@ -198,7 +208,7 @@ def adjoint(cfg, compute_grad, line_search_opt=True, tolerance=1E-4, format="png
         #    break
 
         if line_search_opt:
-            inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(),
+            inicond, f_hist, Efield_hist, alpha = line_search(cfg, inicond.copy(), functional_to_minimize,
                                                               f_hist, f_exp,
                                                               grad,
                                                               stepsize)
@@ -228,7 +238,8 @@ def optimize(cfg):
     print(f"Device: {device}", flush=True)
 
     compute_grad = run_time_loop_adjoint_dto
-    residuals, norm_grads, gradients, alphas, iniconds, f_hists, f_exp, opt_srcs, lbdas = adjoint(cfg, compute_grad=compute_grad, line_search_opt=True)
+    functional_to_minimize = functional_control
+    residuals, norm_grads, gradients, alphas, iniconds, f_hists, f_exp, opt_srcs, lbdas = adjoint(cfg, compute_grad=compute_grad, functional_to_minimize=functional_to_minimize, line_search_opt=True)
 
     save_path = cfg.paths.data_dir / "adj_diff_optim.npz"
     save_path.parent.mkdir(parents=True, exist_ok=True)

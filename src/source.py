@@ -69,6 +69,41 @@ def compute_src(cfg, f_hist, fexp):
     return (f_hist - fexp) * sigxv * sigt
 
 
+def density(cfg, f):
+    res = jnp.sum(f, axis=2, keepdims=True) * cfg.grid.dx
+    return jnp.nan_to_num(res, copy=True, nan=0.0, posinf=0.0, neginf=0.0)
+
+def n(cfg, f):
+    res = jnp.sum(f, axis=1, keepdims=True) * cfg.grid.dv
+    return jnp.nan_to_num(res, copy=True, nan=0.0, posinf=0.0, neginf=0.0)
+
+def macro_vel(cfg, f):
+    res = (1/n(cfg, f)) * jnp.sum(cfg.grid.v * f, axis=1, keepdims=True) * cfg.grid.dv
+    return jnp.nan_to_num(res, copy=True, nan=0.0, posinf=0.0, neginf=0.0)
+
+def temperature(cfg, f):
+    res = (1/n(cfg, f)) * jnp.sum(((cfg.grid.v -macro_vel(cfg, f))**2 )* f, axis=1, keepdims=True) * cfg.grid.dv
+    return jnp.nan_to_num(res, copy=True, nan=0.0, posinf=0.0, neginf=0.0)
+
+
+def compute_src_control(cfg, f_hist, fexp):
+    sigxv, sigt = get_filters_exp(cfg)
+
+    rho_hist = density(cfg, f_hist)
+    rho_exp  = density(cfg, fexp)
+    T_hist   = temperature(cfg, f_hist)
+    T_exp    = temperature(cfg, fexp)
+    u_hist   = macro_vel(cfg, f_hist)
+    
+    v_3d = cfg.grid.v.reshape(1, -1, 1)
+
+    dT_df = ((v_3d - u_hist)**2 - T_hist) / (rho_hist + 1e-12)
+    src = (rho_hist - rho_exp) + (T_hist - T_exp) * dT_df
+    
+    src = jnp.nan_to_num(src, nan=0.0, posinf=0.0, neginf=0.0)  
+    return src * sigxv * sigt
+
+
 def get_filters_exp(cfg):
     filter_xv_dic = {
         "gaussian_x": gaussian_x,
