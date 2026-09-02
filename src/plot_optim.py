@@ -27,7 +27,7 @@ def plot_datas(cfg, datas, suffix, format):
     for it in range(1, len(iniconds)):
         plot_optimisation(cfg, residuals[:it], norm_grads[:it], alphas[:it], iniconds[it], f_hists[it], f_exp, cfg.paths.plot_dir / f"opt_{it:04d}_{suffix}.{format}")
         plot_grad_info(cfg, iniconds[it], gradients[it-1], cfg.paths.plot_dir / f"grad_{it:04d}_{suffix}.{format}")
-        plot_norm_lambda(cfg, lbdas[it-1], cfg.paths.plot_dir / f"norm_lambda_{it:04d}_{suffix}.{format}")
+        #plot_norm_lambda(cfg, lbdas[it-1], cfg.paths.plot_dir / f"norm_lambda_{it:04d}_{suffix}.{format}")
         if suffix == "adj":
             plot_opt_source(cfg, opt_srcs[it-1], cfg.paths.plot_dir / f"opt_src_{it:04d}_{suffix}.{format}")
 

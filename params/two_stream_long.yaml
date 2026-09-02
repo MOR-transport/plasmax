@@ -29,8 +29,8 @@ optim:
   # vd: 3
   # vt: 0.2
   # nb: 0.1
-  filter_xv: gaussian_v
+  filter_xv: ones
   filter_t: ones
   lr: 1
-  Nopt: 50
+  Nopt: 10
  

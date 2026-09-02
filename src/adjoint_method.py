@@ -191,13 +191,20 @@ def adjoint(cfg, compute_grad, functional_to_minimize, line_search_opt=True, tol
         else:
             print("Error : functional to minimize not recognised")
             return
+
         opt_srcs.append(src)
-        adj_hist = compute_grad(cfg, f_hist, Efield_hist, src)
+
+        if compute_grad is run_time_loop_adjoint:
+            c_grad = lambda cfg, f_hist, Efield, src: compute_grad(cfg, Efield, src)
+        if compute_grad is run_time_loop_adjoint_dto:
+                c_grad = lambda cfg, f_hist, Efield, src: compute_grad(cfg, f_hist, Efield, src)
+
+        adj_hist = c_grad(cfg, f_hist, Efield_hist, src)
         lbdas.append(adj_hist)
         grad = - adj_hist[0, :, :]
 
-        auto_grad = jax.grad(func_to_minimize)(inicond) / ( cfg.grid.dx * cfg.grid.dv )
-        print("Comparison with auto differentiation : ", jnp.max(jnp.abs(auto_grad - grad)))
+        # auto_grad = jax.grad(func_to_minimize)(inicond) / ( cfg.grid.dx * cfg.grid.dv )
+        # print("Comparison with auto differentiation : ", jnp.max(jnp.abs(auto_grad - grad)))
 
         gradients.append(grad.copy())
         norm_grads.append(jnp.sqrt(jnp.sum(grad ** 2) / (cfg.grid.lx * cfg.grid.lv)))
@@ -237,7 +244,7 @@ def optimize(cfg):
     device = "GPU" if backend in ("gpu", "cuda") else "CPU"
     print(f"Device: {device}", flush=True)
 
-    compute_grad = run_time_loop_adjoint_dto
+    compute_grad = run_time_loop_adjoint
     functional_to_minimize = functional_control
     residuals, norm_grads, gradients, alphas, iniconds, f_hists, f_exp, opt_srcs, lbdas = adjoint(cfg, compute_grad=compute_grad, functional_to_minimize=functional_to_minimize, line_search_opt=True)
 
